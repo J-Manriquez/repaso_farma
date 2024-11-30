@@ -1,12 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class CustomTextSelectionControls extends MaterialTextSelectionControls {
   CustomTextSelectionControls();
 
   @override
-  Widget buildHandle(
-      BuildContext context, 
+  Widget buildHandle(BuildContext context, 
       TextSelectionHandleType type,
       double textLineHeight, // Cambiado aquí
       [VoidCallback? onTap]) {
@@ -21,7 +19,7 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
     Offset selectionMidpoint,
     List<TextSelectionPoint> endpoints,
     TextSelectionDelegate delegate,
-    ValueListenable<ClipboardStatus>? clipboardStatus, // Cambiado aquí
+    ClipboardStatusNotifier clipboardStatus,
     Offset? lastSecondaryTapDownPosition,
   ) {
     return Container(
@@ -33,47 +31,23 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
           IconButton(
             icon: const Icon(Icons.content_copy),
             onPressed: () {
-              delegate.cutSelection(SelectionChangedCause.toolbar);
-              super
-                  .handleToolbarButtonPress(context, delegate, clipboardStatus);
+              delegate.copySelection(SelectionChangedCause.toolbar);
             },
           ),
           IconButton(
             icon: const Icon(Icons.highlight),
             onPressed: () {
-              // Implementa la lógica de resaltado aquí
-              super
-                  .handleToolbarButtonPress(context, delegate, clipboardStatus);
+              // Implement your custom highlighting logic here.
             },
           ),
           IconButton(
             icon: const Icon(Icons.note_add),
             onPressed: () {
-              // Implementa la lógica para agregar notas aquí
-              super
-                  .handleToolbarButtonPress(context, delegate, clipboardStatus);
+              // Insert your note-adding functionality here.
             },
           ),
         ],
       ),
     );
   }
-
-  @override
-  void handleTap(TextPosition position) {
-    // Implementa según necesites
-  }
-
-  @override
-  bool canCut(TextSelectionDelegate delegate) => delegate.cutEnabled;
-
-  @override
-  bool canCopy(TextSelectionDelegate delegate) => delegate.copyEnabled;
-
-  @override
-  bool canPaste(TextSelectionDelegate delegate) => delegate.pasteEnabled;
-
-  @override
-  bool canSelectAll(TextSelectionDelegate delegate) =>
-      delegate.selectAllEnabled;
 }

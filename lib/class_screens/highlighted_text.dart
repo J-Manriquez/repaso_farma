@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:repaso_farma/class_screens/highlight_colors.dart';
 import 'package:repaso_farma/class_screens/text_selection_controls.dart';
 import 'note_manager.dart';
 
@@ -20,60 +21,55 @@ class HighlightedText extends StatefulWidget {
 
 class _HighlightedTextState extends State<HighlightedText> {
   final NoteManager _noteManager = NoteManager();
-  final CustomTextSelectionControls _selectionControls = CustomTextSelectionControls();
-  String? selectedText;
 
+  // Cursor positions
+  TextSelection? currentSelection;
+  RangeValues? selectedRange;
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SelectableText(
-          widget.text,
-          selectionControls: _selectionControls,
-          onSelectionChanged: (selection, cause) {
-            if (selection != null) {
-              setState(() {
-                selectedText = widget.text.substring(
-                  selection.start,
-                  selection.end,
-                );
-              });
-            }
+        GestureDetector(
+          onLongPress: () {
+            setState(() {
+              currentSelection = TextSelection(
+                baseOffset: 0,
+                extentOffset: widget.text.length,
+              );
+            });
           },
-          style: const TextStyle(fontSize: 16),
+          child: SelectableText(
+            widget.text,
+            selectionControls: CustomTextSelectionControls(),
+            onSelectionChanged: (selection, cause) {
+              setState(() {
+                currentSelection = selection;
+              });
+            },
+          ),
         ),
+        if (currentSelection != null)
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: FloatingActionButton(
+              onPressed: () => _showHighlightOptions(context),
+              child: const Icon(Icons.edit),
+            ),
+          ),
       ],
     );
   }
 
-  void _showHighlightOptions(BuildContext context, int start, int end) {
+  void _showHighlightOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Selección: ${selectedText ?? ""}'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildColorButton(Colors.yellow),
-                  _buildColorButton(Colors.green.shade200),
-                  _buildColorButton(Colors.blue.shade200),
-                  _buildColorButton(Colors.pink.shade200),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  _addNote(context);
-                },
-                child: const Text('Agregar Nota'),
-              ),
-            ],
+        return SizedBox(
+          height: 100,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: HighlightColors.colors.map((color) => _buildColorButton(color)).toList(),
           ),
         );
       },
@@ -83,56 +79,24 @@ class _HighlightedTextState extends State<HighlightedText> {
   Widget _buildColorButton(Color color) {
     return InkWell(
       onTap: () {
-        Navigator.pop(context);
+        setState(() {
+          _noteManager.saveHighlight(
+            widget.className,
+            widget.isTranscription,
+            widget.text.substring(currentSelection!.start, currentSelection!.end),
+            color,
+          );
+        });
+        Navigator.of(context).pop();
       },
       child: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
           color: color,
-          border: Border.all(color: Colors.grey),
           borderRadius: BorderRadius.circular(20),
         ),
       ),
-    );
-  }
-
-  void _addNote(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        String note = '';
-        return AlertDialog(
-          title: const Text('Agregar Nota'),
-          content: TextField(
-            maxLines: 3,
-            onChanged: (value) => note = value,
-            decoration: const InputDecoration(
-              hintText: 'Escribe tu nota aquí',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (selectedText != null && note.isNotEmpty) {
-                  _noteManager.saveNote(
-                    widget.className,
-                    selectedText!,
-                    note,
-                    widget.isTranscription,
-                  );
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

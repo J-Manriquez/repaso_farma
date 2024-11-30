@@ -27,29 +27,21 @@ class NoteManager {
     await prefs.setString(_notesKey, jsonEncode(notes));
   }
 
-  Future<void> saveHighlight(
-    String className,
-    bool isTranscription,
-    int start,
-    int end,
-    Color color,
-  ) async {
+  Future<void> saveHighlight(String className, bool isTranscription, String text, Color color) async {
     final prefs = await SharedPreferences.getInstance();
-    final highlights = await getHighlightsData();
+    // Assumes you have a suitable function to convert Color to a string or store its value in a suitable format and vice versa.
+    final highlights = (json.decode(prefs.getString('highlights_$className') ?? "{}") as Map).cast<String, dynamic>();
 
-    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
-    if (!highlights.containsKey(key)) {
-      highlights[key] = [];
-    }
-
-    highlights[key]!.add({
-      'start': start,
-      'end': end,
+    final highlightEntry = {
+      'text': text,
       'color': color.value,
-    });
+    };
 
-    await prefs.setString(_highlightsKey, jsonEncode(highlights));
+    highlights[isTranscription ? 'transcription' : 'review'].add(highlightEntry);
+
+    await prefs.setString('highlights_$className', json.encode(highlights));
   }
+
 
   Future<Map<TextRange, Color>> getHighlights(
     String className,
