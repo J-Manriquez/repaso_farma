@@ -1,20 +1,30 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
 
 void main() {
-  runApp(const MainApp());
+  runApp(const MyApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
+    return MaterialApp(
+      title: 'Mi Aplicación',
+      debugShowCheckedModeBanner: false, // Esto quita el banner de debug
+      theme: ThemeData(
+        // Configuración del tema principal
+        primarySwatch: Colors.blue,
+        // Puedes personalizar más el tema aquí
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+            minimumSize: const Size(200, 50), // Ancho mínimo para los botones
+          ),
         ),
       ),
+      home: const HomeScreen(), // Pantalla inicial
     );
   }
 }
