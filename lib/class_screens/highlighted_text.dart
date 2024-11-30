@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:repaso_farma/class_screens/highlight_colors.dart';
+import 'package:flutter/services.dart';
 import 'package:repaso_farma/class_screens/text_selection_controls.dart';
 import 'note_manager.dart';
 
@@ -21,82 +21,69 @@ class HighlightedText extends StatefulWidget {
 
 class _HighlightedTextState extends State<HighlightedText> {
   final NoteManager _noteManager = NoteManager();
+  TextSelectionControls? customControls;
 
-  // Cursor positions
-  TextSelection? currentSelection;
-  RangeValues? selectedRange;
+  @override
+  void initState() {
+    super.initState();
+    customControls = CustomTextSelectionControls(
+      onCopy: (value) {
+        Clipboard.setData(ClipboardData(text: value));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Copied: $value")),
+        );
+      },
+      onHighlight: (start, end) {
+        // Implementa lógica para resaltar texto
+      },
+      onNote: (text) {
+        // Implementa lógica para añadir notas
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        GestureDetector(
-          onLongPress: () {
-            setState(() {
-              currentSelection = TextSelection(
-                baseOffset: 0,
-                extentOffset: widget.text.length,
-              );
-            });
-          },
-          child: SelectableText(
-            widget.text,
-            selectionControls: CustomTextSelectionControls(),
-            onSelectionChanged: (selection, cause) {
-              setState(() {
-                currentSelection = selection;
-              });
+        SelectableText(
+          widget.text,
+          style: TextStyle(fontSize: 16),
+          selectionControls: customControls,
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            onPressed: () {
+              showColorPicker(context);
             },
+            child: Icon(Icons.edit),
           ),
         ),
-        if (currentSelection != null)
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () => _showHighlightOptions(context),
-              child: const Icon(Icons.edit),
-            ),
-          ),
       ],
     );
   }
 
-  void _showHighlightOptions(BuildContext context) {
-    showModalBottomSheet(
+  void showColorPicker(BuildContext context) {
+    showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return SizedBox(
-          height: 100,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: HighlightColors.colors.map((color) => _buildColorButton(color)).toList(),
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Choose Color'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              // Implementa un selector de color
+            ),
           ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Done'),
+            ),
+          ],
         );
       },
-    );
-  }
-
-  Widget _buildColorButton(Color color) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _noteManager.saveHighlight(
-            widget.className,
-            widget.isTranscription,
-            widget.text.substring(currentSelection!.start, currentSelection!.end),
-            color,
-          );
-        });
-        Navigator.of(context).pop();
-      },
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
     );
   }
 }

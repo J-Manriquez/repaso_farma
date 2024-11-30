@@ -7,9 +7,9 @@ class ClassDetailScreen extends StatefulWidget {
   final String className;
 
   const ClassDetailScreen({
-    Key? key,
+    super.key,
     required this.className,
-  }) : super(key: key);
+  });
 
   @override
   State<ClassDetailScreen> createState() => _ClassDetailScreenState();
