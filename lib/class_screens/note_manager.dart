@@ -27,21 +27,24 @@ class NoteManager {
     await prefs.setString(_notesKey, jsonEncode(notes));
   }
 
-  Future<void> saveHighlight(String className, bool isTranscription, String text, Color color) async {
+  Future<void> saveHighlight(
+      String className, bool isTranscription, String text, Color color) async {
     final prefs = await SharedPreferences.getInstance();
     // Assumes you have a suitable function to convert Color to a string or store its value in a suitable format and vice versa.
-    final highlights = (json.decode(prefs.getString('highlights_$className') ?? "{}") as Map).cast<String, dynamic>();
+    final highlights =
+        (json.decode(prefs.getString('highlights_$className') ?? "{}") as Map)
+            .cast<String, dynamic>();
 
     final highlightEntry = {
       'text': text,
       'color': color.value,
     };
 
-    highlights[isTranscription ? 'transcription' : 'review'].add(highlightEntry);
+    highlights[isTranscription ? 'transcription' : 'review']
+        .add(highlightEntry);
 
     await prefs.setString('highlights_$className', json.encode(highlights));
   }
-
 
   Future<Map<TextRange, Color>> getHighlights(
     String className,
@@ -49,7 +52,7 @@ class NoteManager {
   ) async {
     final highlights = await getHighlightsData();
     final key = '${className}_${isTranscription ? 'trans' : 'review'}';
-    
+
     Map<TextRange, Color> result = {};
     if (highlights.containsKey(key)) {
       for (var highlight in highlights[key]!) {
@@ -74,10 +77,9 @@ class NoteManager {
 
     if (highlights.containsKey(key)) {
       final highlightList = highlights[key]!;
-      final index = highlightList.indexWhere((h) => 
-        h['start'] == range.start && h['end'] == range.end
-      );
-      
+      final index = highlightList.indexWhere(
+          (h) => h['start'] == range.start && h['end'] == range.end);
+
       if (index != -1) {
         highlightList[index]['color'] = color.value;
         await prefs.setString(_highlightsKey, jsonEncode(highlights));
@@ -95,9 +97,8 @@ class NoteManager {
     final key = '${className}_${isTranscription ? 'trans' : 'review'}';
 
     if (highlights.containsKey(key)) {
-      highlights[key]!.removeWhere((h) =>
-        h['start'] == range.start && h['end'] == range.end
-      );
+      highlights[key]!.removeWhere(
+          (h) => h['start'] == range.start && h['end'] == range.end);
       await prefs.setString(_highlightsKey, jsonEncode(highlights));
     }
   }
@@ -109,12 +110,49 @@ class NoteManager {
 
     final Map<String, dynamic> decoded = jsonDecode(highlightsString);
     Map<String, List<Map<String, dynamic>>> result = {};
-    
+
     decoded.forEach((key, value) {
       result[key] = (value as List).cast<Map<String, dynamic>>();
     });
-    
+
     return result;
+  }
+
+  Future<void> deleteNote(
+    String className,
+    String highlightedText,
+    bool isTranscription,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final notes = await getNotes();
+
+    notes.removeWhere((note) =>
+        note['className'] == className &&
+        note['highlightedText'] == highlightedText &&
+        note['isTranscription'] == isTranscription);
+
+    await prefs.setString(_notesKey, jsonEncode(notes));
+  }
+
+  Future<void> updateNote(
+    String className,
+    String highlightedText,
+    String newNote,
+    bool isTranscription,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final notes = await getNotes();
+
+    final index = notes.indexWhere((note) =>
+        note['className'] == className &&
+        note['highlightedText'] == highlightedText &&
+        note['isTranscription'] == isTranscription);
+
+    if (index != -1) {
+      notes[index]['note'] = newNote;
+      notes[index]['timestamp'] = DateTime.now().toIso8601String();
+      await prefs.setString(_notesKey, jsonEncode(notes));
+    }
   }
 
   Future<List<Map<String, dynamic>>> getNotes() async {

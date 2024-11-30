@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:repaso_farma/class_screens/class_content.dart';
+import 'package:repaso_farma/class_screens/gallery_screen.dart';
+import 'package:repaso_farma/class_screens/notes_screen.dart';
 import 'highlighted_text.dart';
 import 'note_manager.dart';
 
@@ -16,12 +18,13 @@ class ClassDetailScreen extends StatefulWidget {
 }
 
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
-  String _selectedOption = 'Transcripción clase';
+  String _selectedOption = 'Transcripción de la Clase';
   final List<String> _options = [
-    'Transcripción clase',
-    'Repaso clase',
+    'Transcripción de la Clase',
+    'Repaso de la Clase',
+    'Material Visual',
+    'Video',
     'Test',
-    'Video'
   ];
 
   @override
@@ -30,6 +33,21 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
       appBar: AppBar(
         title: Text(widget.className),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.note),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotesScreen(
+                    className: widget.className,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -79,13 +97,15 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             isTranscription: false,
           ),
         );
-      case 'Test':
-        return const Center(
-          child: Text('Próximamente: Sección de Test'),
-        );
+      case 'Material Visual':
+        return GalleryScreen(className: widget.className);
       case 'Video':
         return const Center(
           child: Text('Próximamente: Sección de Video'),
+        );
+      case 'Test':
+        return const Center(
+          child: Text('Próximamente: Sección de Test'),
         );
       default:
         return const SizedBox.shrink();
