@@ -62,6 +62,46 @@ class NoteManager {
     return result;
   }
 
+  Future<void> updateHighlightColor(
+    String className,
+    bool isTranscription,
+    TextRange range,
+    Color color,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final highlights = await getHighlightsData();
+    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
+
+    if (highlights.containsKey(key)) {
+      final highlightList = highlights[key]!;
+      final index = highlightList.indexWhere((h) => 
+        h['start'] == range.start && h['end'] == range.end
+      );
+      
+      if (index != -1) {
+        highlightList[index]['color'] = color.value;
+        await prefs.setString(_highlightsKey, jsonEncode(highlights));
+      }
+    }
+  }
+
+  Future<void> removeHighlight(
+    String className,
+    bool isTranscription,
+    TextRange range,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final highlights = await getHighlightsData();
+    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
+
+    if (highlights.containsKey(key)) {
+      highlights[key]!.removeWhere((h) =>
+        h['start'] == range.start && h['end'] == range.end
+      );
+      await prefs.setString(_highlightsKey, jsonEncode(highlights));
+    }
+  }
+
   Future<Map<String, List<Map<String, dynamic>>>> getHighlightsData() async {
     final prefs = await SharedPreferences.getInstance();
     final String? highlightsString = prefs.getString(_highlightsKey);
