@@ -35,22 +35,27 @@ class _HighlightedTextState extends State<HighlightedText> {
   @override
   void initState() {
     super.initState();
-    _loadHighlights();
     customControls = CustomTextSelectionControls(
       onCopy: _handleCopy,
       onHighlight: _handleHighlight,
       onNote: _handleNoteAdd,
     );
-    _loadNotes(); // Añadir esta línea
+    _loadData();
   }
 
-  // Añadir este método
-  Future<void> _loadNotes() async {
-    final allNotes = await _noteManager.getNotes();
-    if (!mounted) return; // Verificar si el widget aún está montado
+  Future<void> _loadData() async {
+    final loadedHighlights = await _noteManager.getHighlights(
+      widget.className,
+      widget.isTranscription,
+    );
+    final loadedNotes = await _noteManager.getNotes();
+
+    if (!mounted) return;
+
     setState(() {
+      highlights = loadedHighlights;
       notes = Map.fromEntries(
-        allNotes
+        loadedNotes
             .where((note) =>
                 note['className'] == widget.className &&
                 note['isTranscription'] == widget.isTranscription)
@@ -59,6 +64,22 @@ class _HighlightedTextState extends State<HighlightedText> {
       );
     });
   }
+
+  // // Añadir este método
+  // Future<void> _loadNotes() async {
+  //   final allNotes = await _noteManager.getNotes();
+  //   if (!mounted) return; // Verificar si el widget aún está montado
+  //   setState(() {
+  //     notes = Map.fromEntries(
+  //       allNotes
+  //           .where((note) =>
+  //               note['className'] == widget.className &&
+  //               note['isTranscription'] == widget.isTranscription)
+  //           .map((note) => MapEntry(
+  //               note['highlightedText'] as String, note['note'] as String)),
+  //     );
+  //   });
+  // }
 
   void _handleCopy(String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -164,6 +185,24 @@ class _HighlightedTextState extends State<HighlightedText> {
       }
 
       var info = allRanges[range]!;
+      var gestureRecognizer;
+      
+      if (info['type'] == 'highlight') {
+        gestureRecognizer = DoubleTapGestureRecognizer()
+          ..onDoubleTap = () {
+            setState(() {
+              selectedHighlight = range;
+              selectedText = widget.text.substring(range.start, range.end);
+            });
+            _showHighlightOptions(range);
+          };
+      } else if (info['hasNote']) {
+        gestureRecognizer = TapGestureRecognizer()
+          ..onTap = () {
+            _handleNoteAdd(widget.text.substring(range.start, range.end));
+          };
+      }
+
       spans.add(TextSpan(
         text: widget.text.substring(range.start, range.end),
         style: TextStyle(
@@ -173,22 +212,7 @@ class _HighlightedTextState extends State<HighlightedText> {
           decorationColor: const Color.fromARGB(255, 0, 0, 0),
           decorationThickness: 2,
         ),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () {
-            setState(() {
-              selectedHighlight = range;
-              selectedText = widget.text.substring(range.start, range.end);
-            });
-
-            if (info['hasNote']) {
-              _showNoteDialog(
-                widget.text.substring(range.start, range.end),
-                info['note'],
-              );
-            } else if (info['type'] == 'highlight') {
-              _showHighlightOptions(range);
-            }
-          },
+        recognizer: gestureRecognizer,
       ));
 
       currentIndex = range.end;
@@ -298,7 +322,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                             );
                             if (!mounted) return;
                             Navigator.of(context).pop();
-                            await _loadNotes();
+                            await _loadData();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Nota guardada')),
                             );
@@ -411,7 +435,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                           );
                           if (!mounted) return;
                           Navigator.pop(dialogContext);
-                          _loadNotes();
+                          _loadData();
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.red,
@@ -473,15 +497,15 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  Future<void> _loadHighlights() async {
-    final loadedHighlights = await _noteManager.getHighlights(
-      widget.className,
-      widget.isTranscription,
-    );
-    setState(() {
-      highlights = loadedHighlights;
-    });
-  }
+  // Future<void> _loadHighlights() async {
+  //   final loadedHighlights = await _noteManager.getHighlights(
+  //     widget.className,
+  //     widget.isTranscription,
+  //   );
+  //   setState(() {
+  //     highlights = loadedHighlights;
+  //   });
+  // }
 
   Widget _buildMenuOption(IconData icon, String text, {Color? color}) {
     return Row(
