@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="repaso_farma"
+        android:label="Repaso Farma"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
