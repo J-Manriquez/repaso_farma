@@ -24,18 +24,22 @@ class NoteManager {
   }
 
   Future<void> saveHighlight(
-      String className, bool isTranscription, String text, Color color) async {
+    String className,
+    bool isTranscription,
+    String text,
+    Color color,
+  ) async {
     await _storage.saveHighlight(
       className,
       isTranscription,
       text,
-      0, // Necesitarás pasar el inicio real
-      text.length, // Y el final real
+      0,
+      text.length,
       color,
     );
   }
 
-  Future<Map<TextRange, Color>> getHighlights(
+  Future<Map<String, Color>> getHighlights(
     String className,
     bool isTranscription,
   ) async {
@@ -45,14 +49,14 @@ class NoteManager {
   Future<void> updateHighlightColor(
     String className,
     bool isTranscription,
-    TextRange range,
+    String text,
     Color color,
   ) async {
     await _storage.updateHighlight(
       className,
       isTranscription,
-      range.start,
-      range.end,
+      0,
+      text.length,
       color,
     );
   }
@@ -60,13 +64,12 @@ class NoteManager {
   Future<void> removeHighlight(
     String className,
     bool isTranscription,
-    TextRange range,
+    String text,
   ) async {
     await _storage.removeHighlight(
       className,
       isTranscription,
-      range.start,
-      range.end,
+      text,
     );
   }
 
@@ -112,4 +115,15 @@ class NoteManager {
     });
   }
 
+  // Método para guardar datos en SharedPreferences
+  Future<void> _saveToPrefs(String key, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+  }
+
+  // Método para obtener datos de SharedPreferences
+  Future<String?> _getFromPrefs(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(key);
+  }
 }

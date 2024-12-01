@@ -82,10 +82,9 @@ class StorageManager {
       data['highlights'][key] = [];
     }
 
+    // Guardar el texto resaltado en lugar de las posiciones
     data['highlights'][key].add({
       'text': text,
-      'start': start,
-      'end': end,
       'color': color.value,
     });
 
@@ -118,37 +117,31 @@ class StorageManager {
   Future<void> removeHighlight(
     String className,
     bool isTranscription,
-    int start,
-    int end,
+    String text,
   ) async {
     final data = await loadData();
     final key = '${className}_${isTranscription ? 'trans' : 'review'}';
 
     if (data['highlights'].containsKey(key)) {
       final highlights = data['highlights'][key] as List;
-      highlights.removeWhere(
-        (h) => h['start'] == start && h['end'] == end,
-      );
+      highlights.removeWhere((h) => h['text'] == text);
       await saveData(data);
     }
   }
 
-  Future<Map<TextRange, Color>> getHighlights(
+  Future<Map<String, Color>> getHighlights(
     String className,
     bool isTranscription,
   ) async {
     final data = await loadData();
     final key = '${className}_${isTranscription ? 'trans' : 'review'}';
 
-    Map<TextRange, Color> result = {};
+    Map<String, Color> result = {};
 
     if (data['highlights'].containsKey(key)) {
       final highlights = data['highlights'][key] as List;
       for (var highlight in highlights) {
-        result[TextRange(
-          start: highlight['start'] as int,
-          end: highlight['end'] as int,
-        )] = Color(highlight['color'] as int);
+        result[highlight['text'] as String] = Color(highlight['color'] as int);
       }
     }
 

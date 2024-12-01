@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart'; // Añade esta importación
-import 'text_selection_controls.dart'; // Volvemos a necesitar esta importación
+import 'package:flutter/gestures.dart';
+import 'text_selection_controls.dart';
 import 'package:repaso_farma/class_screens/highlight_colors.dart';
 import 'note_manager.dart';
 import 'color_picker.dart';
@@ -25,12 +27,13 @@ class HighlightedText extends StatefulWidget {
 class _HighlightedTextState extends State<HighlightedText> {
   final NoteManager _noteManager = NoteManager();
   TextSelectionControls? customControls;
-  Map<TextRange, Color> highlights = {};
+  Map<String, Color> highlights = {};
+  Map<String, String> notes = {};
   Color currentHighlightColor = HighlightColors.colors[0];
-
-  TextRange? selectedHighlight;
   String? selectedText;
-  Map<String, String> notes = {}; // Para almacenar texto -> nota
+  int tapCount = 0;
+  String? lastTappedText;
+  Timer? _tapTimer;
 
   @override
   void initState() {
@@ -41,6 +44,12 @@ class _HighlightedTextState extends State<HighlightedText> {
       onNote: _handleNoteAdd,
     );
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tapTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -65,30 +74,39 @@ class _HighlightedTextState extends State<HighlightedText> {
     });
   }
 
-  // // Añadir este método
-  // Future<void> _loadNotes() async {
-  //   final allNotes = await _noteManager.getNotes();
-  //   if (!mounted) return; // Verificar si el widget aún está montado
-  //   setState(() {
-  //     notes = Map.fromEntries(
-  //       allNotes
-  //           .where((note) =>
-  //               note['className'] == widget.className &&
-  //               note['isTranscription'] == widget.isTranscription)
-  //           .map((note) => MapEntry(
-  //               note['highlightedText'] as String, note['note'] as String)),
-  //     );
-  //   });
-  // }
+  void _handleTap(String text) {
+    if (lastTappedText != text) {
+      tapCount = 0;
+      _tapTimer?.cancel();
+    }
+
+    lastTappedText = text;
+    tapCount++;
+
+    _tapTimer?.cancel();
+    _tapTimer = Timer(const Duration(milliseconds: 500), () {
+      if (tapCount == 2) {
+        // Doble tap para editar resaltado
+        _showHighlightOptions(text);
+      } else if (tapCount == 3) {
+        // Triple tap para editar nota
+        _handleNoteAdd(text);
+      }
+      tapCount = 0;
+    });
+  }
 
   void _handleCopy(String text) {
     Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Texto copiado al portapapeles")),
     );
   }
 
   void _handleHighlight(int start, int end) {
+    final selectedText = widget.text.substring(start, end);
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) {
@@ -97,13 +115,13 @@ class _HighlightedTextState extends State<HighlightedText> {
           content: ColorPicker(
             onColorSelected: (color) {
               setState(() {
-                highlights[TextRange(start: start, end: end)] = color;
+                highlights[selectedText] = color;
                 currentHighlightColor = color;
               });
               _noteManager.saveHighlight(
                 widget.className,
                 widget.isTranscription,
-                widget.text.substring(start, end),
+                selectedText,
                 color,
               );
               Navigator.of(context).pop();
@@ -135,113 +153,91 @@ class _HighlightedTextState extends State<HighlightedText> {
   }
 
   List<TextSpan> _buildTextSpans() {
-    if (highlights.isEmpty && notes.isEmpty) {
-      return [TextSpan(text: widget.text)];
-    }
-
     List<TextSpan> spans = [];
-    int currentIndex = 0;
+    String remainingText = widget.text;
 
-    // Crear un mapa combinado de highlights y notas
-    var allRanges = <TextRange, Map<String, dynamic>>{};
+    while (remainingText.isNotEmpty) {
+      bool foundHighlight = false;
+      String? highlightedText;
+      Color? highlightColor;
 
-    // Añadir highlights existentes
-    for (var entry in highlights.entries) {
-      allRanges[entry.key] = {
-        'type': 'highlight',
-        'color': entry.value,
-        'hasNote': false,
-      };
-    }
-
-    // Añadir o combinar notas
-    for (var entry in notes.entries) {
-      var start = widget.text.indexOf(entry.key);
-      if (start != -1) {
-        var range = TextRange(start: start, end: start + entry.key.length);
-
-        if (allRanges.containsKey(range)) {
-          // Si ya existe un highlight en este rango, añadir la nota
-          allRanges[range]!['hasNote'] = true;
-          allRanges[range]!['note'] = entry.value;
-        } else {
-          // Si no existe highlight, crear nuevo rango solo con nota
-          allRanges[range] = {
-            'type': 'note',
-            'note': entry.value,
-            'hasNote': true,
-          };
+      // Buscar el highlight más cercano
+      for (var entry in highlights.entries) {
+        int index = remainingText.indexOf(entry.key);
+        if (index == 0) {
+          highlightedText = entry.key;
+          highlightColor = entry.value;
+          foundHighlight = true;
+          break;
         }
       }
-    }
 
-    var sortedRanges = allRanges.keys.toList()
-      ..sort((a, b) => a.start.compareTo(b.start));
+      if (foundHighlight && highlightedText != null) {
+        spans.add(TextSpan(
+          text: highlightedText,
+          style: TextStyle(
+            // El resaltado va en el fondo
+            backgroundColor: highlightColor?.withOpacity(
+                0.3), // Reducimos la opacidad para que sea más sutil
 
-    for (var range in sortedRanges) {
-      if (currentIndex < range.start) {
-        spans.add(
-            TextSpan(text: widget.text.substring(currentIndex, range.start)));
+            // El subrayado va por encima del resaltado
+            decoration: notes.containsKey(highlightedText)
+                ? TextDecoration.combine([
+                    TextDecoration.underline,
+                    // Puedes añadir más decoraciones si lo necesitas
+                  ])
+                : null,
+            decorationStyle: TextDecorationStyle.dotted,
+            decorationColor: Colors.black,
+            decorationThickness: 2,
+
+            // Asegurarse de que el texto sea legible
+            color: Colors.black, // Color del texto
+            height: 1.5, // Espaciado entre líneas
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => _handleTap(highlightedText!),
+        ));
+        remainingText = remainingText.substring(highlightedText.length);
+      } else {
+        int nextHighlightIndex = remainingText.length;
+        for (var text in highlights.keys) {
+          int index = remainingText.indexOf(text);
+          if (index > 0 && index < nextHighlightIndex) {
+            nextHighlightIndex = index;
+          }
+        }
+
+        spans.add(TextSpan(
+          text: remainingText.substring(0, nextHighlightIndex),
+          style: const TextStyle(
+            // Estilo para texto no resaltado
+            height: 1.5,
+            color: Colors.black,
+          ),
+        ));
+        remainingText = remainingText.substring(nextHighlightIndex);
       }
-
-      var info = allRanges[range]!;
-      var gestureRecognizer;
-      
-      if (info['type'] == 'highlight') {
-        gestureRecognizer = DoubleTapGestureRecognizer()
-          ..onDoubleTap = () {
-            setState(() {
-              selectedHighlight = range;
-              selectedText = widget.text.substring(range.start, range.end);
-            });
-            _showHighlightOptions(range);
-          };
-      } else if (info['hasNote']) {
-        gestureRecognizer = TapGestureRecognizer()
-          ..onTap = () {
-            _handleNoteAdd(widget.text.substring(range.start, range.end));
-          };
-      }
-
-      spans.add(TextSpan(
-        text: widget.text.substring(range.start, range.end),
-        style: TextStyle(
-          backgroundColor: info['type'] == 'highlight' ? info['color'] : null,
-          decoration: info['hasNote'] ? TextDecoration.underline : null,
-          decorationStyle: info['hasNote'] ? TextDecorationStyle.dotted : null,
-          decorationColor: const Color.fromARGB(255, 0, 0, 0),
-          decorationThickness: 2,
-        ),
-        recognizer: gestureRecognizer,
-      ));
-
-      currentIndex = range.end;
-    }
-
-    if (currentIndex < widget.text.length) {
-      spans.add(TextSpan(text: widget.text.substring(currentIndex)));
     }
 
     return spans;
   }
 
-  // Modificar el método _handleNoteAdd para actualizar la UI después de guardar
   void _handleNoteAdd(String text) {
     final textController = TextEditingController();
     if (notes.containsKey(text)) {
       textController.text = notes[text]!;
     }
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
           child: Container(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height *
-                  0.8, // 80% de la altura de la pantalla
-              maxWidth: MediaQuery.of(context).size.width *
-                  0.9, // 90% del ancho de la pantalla
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+              maxWidth: MediaQuery.of(context).size.width * 0.9,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -276,9 +272,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                             color: Colors.grey[200],
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: SingleChildScrollView(
-                            child: Text(text),
-                          ),
+                          child: Text(text),
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -320,7 +314,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                               textController.text,
                               widget.isTranscription,
                             );
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             Navigator.of(context).pop();
                             await _loadData();
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -341,171 +335,72 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _showNoteDialog(String highlightedText, String note) {
-    if (!mounted) return;
+  void _showHighlightOptions(String highlightedText) {
+    if (!context.mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return Dialog(
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.8,
-              maxWidth: MediaQuery.of(context).size.width * 0.9,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBar(
-                  title: const Text('Nota'),
-                  automaticallyImplyLeading: false,
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                    ),
-                  ],
-                ),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Texto seleccionado:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: SingleChildScrollView(
-                            child: Text(highlightedText),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Nota:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: SingleChildScrollView(
-                            child: Text(note),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          _handleNoteAdd(highlightedText);
-                        },
-                        child: const Text('Editar'),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () async {
-                          await _noteManager.deleteNote(
-                            widget.className,
-                            highlightedText,
-                            widget.isTranscription,
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(dialogContext);
-                          _loadData();
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.red,
-                        ),
-                        child: const Text('Eliminar'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showHighlightOptions(TextRange range) {
-    // Obtener la posición global del texto resaltado
     final RenderBox box = context.findRenderObject() as RenderBox;
     final Offset position = box.localToGlobal(Offset.zero);
-
-    // Calcular la posición del menú
-    const double topOffset = 60.0; // Ajusta este valor según necesites
 
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-        position.dx + range.start.toDouble(),
-        position.dy - topOffset,
-        position.dx + range.start.toDouble() + 200,
+        position.dx,
+        position.dy + 50,
+        position.dx + 200,
         position.dy,
       ),
       items: [
         PopupMenuItem(
           child: _buildMenuOption(Icons.content_copy, 'Copiar'),
-          onTap: () => _handleCopyHighlighted(),
-        ),
-        PopupMenuItem(
-          child: _buildMenuOption(Icons.color_lens, 'Cambiar color'),
-          onTap: () => Future.delayed(
-            const Duration(seconds: 0),
-            () => _showColorPicker(range),
-          ),
-        ),
-        PopupMenuItem(
-          child: _buildMenuOption(Icons.note_add, 'Agregar/Editar nota'),
-          onTap: () => Future.delayed(
-            const Duration(seconds: 0),
-            () => _handleNoteAdd(selectedText!),
-          ),
+          onTap: () => _handleCopy(highlightedText),
         ),
         PopupMenuItem(
           child: _buildMenuOption(Icons.delete, 'Eliminar resaltado',
               color: Colors.red),
-          onTap: () => _removeHighlight(range),
+          onTap: () => _removeHighlight(highlightedText),
+        ),
+        PopupMenuItem(
+          child: _buildMenuOption(Icons.color_lens, 'Cambiar color'),
+          onTap: () {
+            Future.delayed(
+              const Duration(seconds: 0),
+              () => _showColorPickerDialog(highlightedText),
+            );
+          },
         ),
       ],
     );
   }
 
-  // Future<void> _loadHighlights() async {
-  //   final loadedHighlights = await _noteManager.getHighlights(
-  //     widget.className,
-  //     widget.isTranscription,
-  //   );
-  //   setState(() {
-  //     highlights = loadedHighlights;
-  //   });
-  // }
+  void _showColorPickerDialog(String highlightedText) {
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar color'),
+        content: ColorPicker(
+          onColorSelected: (color) {
+            setState(() {
+              highlights[highlightedText] = color;
+            });
+            _noteManager.saveHighlight(
+              widget.className,
+              widget.isTranscription,
+              highlightedText,
+              color,
+            );
+            Navigator.of(context).pop();
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildMenuOption(IconData icon, String text, {Color? color}) {
     return Row(
@@ -517,57 +412,17 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _handleCopyHighlighted() {
-    if (selectedText != null) {
-      Clipboard.setData(ClipboardData(text: selectedText!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Texto copiado al portapapeles")),
-      );
-    }
-  }
-
-  void _showColorPicker(TextRange range) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Cambiar color'),
-          content: ColorPicker(
-            onColorSelected: (color) {
-              setState(() {
-                highlights[range] = color;
-              });
-              _noteManager.updateHighlightColor(
-                widget.className,
-                widget.isTranscription,
-                range,
-                color,
-              );
-              Navigator.of(context).pop();
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _removeHighlight(TextRange range) {
+  void _removeHighlight(String text) {
     setState(() {
-      highlights.remove(range);
+      highlights.remove(text);
     });
     _noteManager.removeHighlight(
       widget.className,
       widget.isTranscription,
-      range,
+      text,
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Resaltado eliminado")),
+      const SnackBar(content: Text('Resaltado eliminado')),
     );
   }
 }
