@@ -34,6 +34,7 @@ class _HighlightedTextState extends State<HighlightedText> {
   int tapCount = 0;
   String? lastTappedText;
   Timer? _tapTimer;
+  Timer? _longPressTimer;
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _HighlightedTextState extends State<HighlightedText> {
   @override
   void dispose() {
     _tapTimer?.cancel();
+    _longPressTimer?.cancel();
     super.dispose();
   }
 
@@ -86,21 +88,47 @@ class _HighlightedTextState extends State<HighlightedText> {
     _tapTimer?.cancel();
     _tapTimer = Timer(const Duration(milliseconds: 500), () {
       if (tapCount == 2) {
-        // Doble tap para editar resaltado
+        // Double tap to edit highlight
         _showHighlightOptions(text);
-      } else if (tapCount == 3) {
-        // Triple tap para editar nota
-        _handleNoteAdd(text);
       }
       tapCount = 0;
     });
+  }
+
+  void _handleNoteLongPress(String text) {
+    if (!context.mounted) return;
+    
+    showMenu(
+      context: context,
+      position: const RelativeRect.fromLTRB(100, 100, 0, 0),
+      items: [
+        PopupMenuItem(
+          child: _buildMenuOption(Icons.edit, 'Edit note'),
+          onTap: () => _handleNoteAdd(text),
+        ),
+        PopupMenuItem(
+          child: _buildMenuOption(Icons.delete, 'Delete note', color: Colors.red),
+          onTap: () async {
+            await _noteManager.deleteNote(
+              widget.className,
+              text,
+              widget.isTranscription,
+            );
+            if (!mounted) return;
+            setState(() {
+              notes.remove(text);
+            });
+          },
+        ),
+      ],
+    );
   }
 
   void _handleCopy(String text) {
     Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Texto copiado al portapapeles")),
+      const SnackBar(content: Text("Text copied to clipboard")),
     );
   }
 
@@ -111,7 +139,7 @@ class _HighlightedTextState extends State<HighlightedText> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Selecciona un color'),
+          title: const Text('Select a color'),
           content: ColorPicker(
             onColorSelected: (color) {
               setState(() {
@@ -130,7 +158,7 @@ class _HighlightedTextState extends State<HighlightedText> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -161,7 +189,6 @@ class _HighlightedTextState extends State<HighlightedText> {
       String? highlightedText;
       Color? highlightColor;
 
-      // Buscar el highlight más cercano
       for (var entry in highlights.entries) {
         int index = remainingText.indexOf(entry.key);
         if (index == 0) {
@@ -176,27 +203,30 @@ class _HighlightedTextState extends State<HighlightedText> {
         spans.add(TextSpan(
           text: highlightedText,
           style: TextStyle(
-            // El resaltado va en el fondo
-            backgroundColor: highlightColor?.withOpacity(
-                0.3), // Reducimos la opacidad para que sea más sutil
-
-            // El subrayado va por encima del resaltado
+            backgroundColor: highlightColor?.withOpacity(0.3),
             decoration: notes.containsKey(highlightedText)
-                ? TextDecoration.combine([
-                    TextDecoration.underline,
-                    // Puedes añadir más decoraciones si lo necesitas
-                  ])
+                ? TextDecoration.underline
                 : null,
             decorationStyle: TextDecorationStyle.dotted,
             decorationColor: Colors.black,
             decorationThickness: 2,
-
-            // Asegurarse de que el texto sea legible
-            color: Colors.black, // Color del texto
-            height: 1.5, // Espaciado entre líneas
+            color: Colors.black,
+            height: 1.5,
           ),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () => _handleTap(highlightedText!),
+          recognizer: GestureRecognizer()
+            ..onTapDown = (details) {
+              if (notes.containsKey(highlightedText)) {
+                _longPressTimer?.cancel();
+                _longPressTimer = Timer(
+                  const Duration(milliseconds: 1500),
+                  () => _handleNoteLongPress(highlightedText!),
+                );
+              }
+            }
+            ..onTapUp = (details) {
+              _longPressTimer?.cancel();
+              _handleTap(highlightedText!);
+            },
         ));
         remainingText = remainingText.substring(highlightedText.length);
       } else {
@@ -211,7 +241,6 @@ class _HighlightedTextState extends State<HighlightedText> {
         spans.add(TextSpan(
           text: remainingText.substring(0, nextHighlightIndex),
           style: const TextStyle(
-            // Estilo para texto no resaltado
             height: 1.5,
             color: Colors.black,
           ),
@@ -243,7 +272,7 @@ class _HighlightedTextState extends State<HighlightedText> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppBar(
-                  title: const Text('Añadir/Editar nota'),
+                  title: const Text('Add/Edit Note'),
                   automaticallyImplyLeading: false,
                   actions: [
                     IconButton(
@@ -259,7 +288,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Texto seleccionado:',
+                          'Selected text:',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -276,7 +305,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          'Tu nota:',
+                          'Your note:',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -286,7 +315,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                         TextField(
                           controller: textController,
                           decoration: const InputDecoration(
-                            hintText: 'Escribe tu nota aquí',
+                            hintText: 'Write your note here',
                             border: OutlineInputBorder(),
                           ),
                           maxLines: 5,
@@ -302,7 +331,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancelar'),
+                        child: const Text('Cancel'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
@@ -318,11 +347,11 @@ class _HighlightedTextState extends State<HighlightedText> {
                             Navigator.of(context).pop();
                             await _loadData();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Nota guardada')),
+                              const SnackBar(content: Text('Note saved')),
                             );
                           }
                         },
-                        child: const Text('Guardar'),
+                        child: const Text('Save'),
                       ),
                     ],
                   ),
@@ -338,29 +367,21 @@ class _HighlightedTextState extends State<HighlightedText> {
   void _showHighlightOptions(String highlightedText) {
     if (!context.mounted) return;
 
-    final RenderBox box = context.findRenderObject() as RenderBox;
-    final Offset position = box.localToGlobal(Offset.zero);
-
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy + 50,
-        position.dx + 200,
-        position.dy,
-      ),
+      position: const RelativeRect.fromLTRB(100, 100, 0, 0),
       items: [
         PopupMenuItem(
-          child: _buildMenuOption(Icons.content_copy, 'Copiar'),
+          child: _buildMenuOption(Icons.content_copy, 'Copy'),
           onTap: () => _handleCopy(highlightedText),
         ),
         PopupMenuItem(
-          child: _buildMenuOption(Icons.delete, 'Eliminar resaltado',
+          child: _buildMenuOption(Icons.delete, 'Remove highlight',
               color: Colors.red),
           onTap: () => _removeHighlight(highlightedText),
         ),
         PopupMenuItem(
-          child: _buildMenuOption(Icons.color_lens, 'Cambiar color'),
+          child: _buildMenuOption(Icons.color_lens, 'Change color'),
           onTap: () {
             Future.delayed(
               const Duration(seconds: 0),
@@ -377,7 +398,7 @@ class _HighlightedTextState extends State<HighlightedText> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Seleccionar color'),
+        title: const Text('Select color'),
         content: ColorPicker(
           onColorSelected: (color) {
             setState(() {
@@ -395,7 +416,7 @@ class _HighlightedTextState extends State<HighlightedText> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -422,7 +443,7 @@ class _HighlightedTextState extends State<HighlightedText> {
       text,
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Resaltado eliminado')),
+      const SnackBar(content: Text('Highlight removed')),
     );
   }
 }
