@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
+import 'package:repaso_farma/class_screens/full_screen_image.dart';
 
 class GalleryScreen extends StatefulWidget {
   final String className;
@@ -16,6 +17,7 @@ class GalleryScreen extends StatefulWidget {
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
 }
+
 class _GalleryScreenState extends State<GalleryScreen> {
   List<String> _imagePaths = [];
   bool _isLoading = true;
@@ -26,7 +28,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     _loadImages();
   }
 
-   String _formatClassName(String className) {
+  String _formatClassName(String className) {
     // Reemplaza espacios con guiones bajos y elimina caracteres especiales
     return className.replaceAll(' ', '_').replaceAll(RegExp(r'[^\w\s]'), '');
   }
@@ -36,16 +38,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
       // Cargar imágenes desde los assets
       final manifestContent = await rootBundle.loadString('AssetManifest.json');
       final Map<String, dynamic> manifestMap = json.decode(manifestContent);
-      
+
       // Formatear el nombre de la clase para la ruta
       final formattedClassName = _formatClassName(widget.className);
-      
+
       // Filtrar las imágenes de la clase específica
       final imagePaths = manifestMap.keys
           .where((String key) => key.contains('assets/${formattedClassName}/'))
-          .where((String key) => key.contains('.jpg') || 
-                                key.contains('.png') || 
-                                key.contains('.jpeg'))
+          .where((String key) =>
+              key.contains('.jpg') ||
+              key.contains('.png') ||
+              key.contains('.jpeg'))
           .toList();
 
       print('Buscando imágenes en: assets/${formattedClassName}/');
@@ -104,40 +107,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   void _showImageDialog(String imagePath) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
-            maxWidth: MediaQuery.of(context).size.width * 0.9,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppBar(
-                title: const Text('Imagen'),
-                automaticallyImplyLeading: false,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              Flexible(
-                child: InteractiveViewer(
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: Hero(
-                    tag: imagePath,
-                    child: Image.asset(imagePath),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenImage(imagePath: imagePath),
       ),
     );
   }
