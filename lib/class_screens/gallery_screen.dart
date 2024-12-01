@@ -16,9 +16,8 @@ class GalleryScreen extends StatefulWidget {
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
 }
-
 class _GalleryScreenState extends State<GalleryScreen> {
-  List<File> _images = [];
+  List<String> _imagePaths = [];
   bool _isLoading = true;
 
   @override
@@ -27,21 +26,33 @@ class _GalleryScreenState extends State<GalleryScreen> {
     _loadImages();
   }
 
+   String _formatClassName(String className) {
+    // Reemplaza espacios con guiones bajos y elimina caracteres especiales
+    return className.replaceAll(' ', '_').replaceAll(RegExp(r'[^\w\s]'), '');
+  }
+
   Future<void> _loadImages() async {
     try {
       // Cargar imágenes desde los assets
       final manifestContent = await rootBundle.loadString('AssetManifest.json');
       final Map<String, dynamic> manifestMap = json.decode(manifestContent);
       
+      // Formatear el nombre de la clase para la ruta
+      final formattedClassName = _formatClassName(widget.className);
+      
       // Filtrar las imágenes de la clase específica
       final imagePaths = manifestMap.keys
-          .where((String key) => key.contains('assets/${widget.className}/'))
+          .where((String key) => key.contains('assets/${formattedClassName}/'))
           .where((String key) => key.contains('.jpg') || 
                                 key.contains('.png') || 
                                 key.contains('.jpeg'))
           .toList();
 
+      print('Buscando imágenes en: assets/${formattedClassName}/');
+      print('Imágenes encontradas: $imagePaths');
+
       setState(() {
+        _imagePaths = imagePaths;
         _isLoading = false;
       });
     } catch (e) {
@@ -58,7 +69,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_images.isEmpty) {
+    if (_imagePaths.isEmpty) {
       return const Center(
         child: Text('No hay imágenes disponibles para esta clase'),
       );
@@ -71,17 +82,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: _images.length,
+      itemCount: _imagePaths.length,
       itemBuilder: (context, index) {
         return GestureDetector(
-          onTap: () => _showImageDialog(_images[index]),
+          onTap: () => _showImageDialog(_imagePaths[index]),
           child: Hero(
-            tag: _images[index].path,
+            tag: _imagePaths[index],
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 image: DecorationImage(
-                  image: FileImage(_images[index]),
+                  image: AssetImage(_imagePaths[index]),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -92,7 +103,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  void _showImageDialog(File image) {
+  void _showImageDialog(String imagePath) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -119,8 +130,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   minScale: 0.5,
                   maxScale: 4.0,
                   child: Hero(
-                    tag: image.path,
-                    child: Image.file(image),
+                    tag: imagePath,
+                    child: Image.asset(imagePath),
                   ),
                 ),
               ),

@@ -79,7 +79,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
   Widget _buildContent() {
     switch (_selectedOption) {
-      case 'Transcripción clase':
+      case 'Transcripción de la Clase':
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: HighlightedText(
@@ -88,7 +88,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             isTranscription: true,
           ),
         );
-      case 'Repaso clase':
+      case 'Repaso de la Clase':
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: HighlightedText(
