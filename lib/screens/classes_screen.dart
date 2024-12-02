@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:repaso_farma/class_screens/class_detail_screen.dart';
+import 'package:repaso_farma/screens/class_detail_screen.dart';
 
 class ClassesScreen extends StatelessWidget {
   const ClassesScreen({super.key});

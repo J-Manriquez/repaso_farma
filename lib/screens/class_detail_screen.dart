@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:repaso_farma/class_screens/class_content.dart';
-import 'package:repaso_farma/class_screens/gallery_screen.dart';
-import 'package:repaso_farma/class_screens/notes_screen.dart';
-import 'highlighted_text.dart';
-import 'note_manager.dart';
+import 'package:repaso_farma/functions/class_content.dart';
+import 'package:repaso_farma/screens/gallery_screen.dart';
+import 'package:repaso_farma/screens/notes_screen.dart';
+import '../functions/highlighted_text.dart';
+import '../functions/note_manager.dart';
 
 class ClassDetailScreen extends StatefulWidget {
   final String className;

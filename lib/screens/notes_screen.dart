@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'note_manager.dart';
+import '../functions/note_manager.dart';
 
 class NotesScreen extends StatefulWidget {
   final String className;
