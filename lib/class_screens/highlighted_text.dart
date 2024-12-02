@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -6,6 +5,7 @@ import 'text_selection_controls.dart';
 import 'package:repaso_farma/class_screens/highlight_colors.dart';
 import 'note_manager.dart';
 import 'color_picker.dart';
+import 'dart:async';
 
 class HighlightedText extends StatefulWidget {
   final String text;
@@ -26,12 +26,12 @@ class HighlightedText extends StatefulWidget {
 class _HighlightedTextState extends State<HighlightedText> {
   final NoteManager _noteManager = NoteManager();
   TextSelectionControls? customControls;
-  Map<String, Color> highlights = {};
+  Map<TextRange, Color> highlights = {};
   Map<String, String> notes = {};
   Color currentHighlightColor = HighlightColors.colors[0];
+  TextRange? selectedHighlight;
   String? selectedText;
   int tapCount = 0;
-  String? lastTappedText;
   Timer? _tapTimer;
   Timer? _longPressTimer;
   bool _isMenuOpen = false;
@@ -64,59 +64,39 @@ class _HighlightedTextState extends State<HighlightedText> {
     if (!mounted) return;
 
     setState(() {
-      highlights = loadedHighlights;
-      notes = Map.fromEntries(
-        loadedNotes
-            .where((note) =>
-                note['className'] == widget.className &&
-                note['isTranscription'] == widget.isTranscription)
-            .map((note) => MapEntry(
-                note['highlightedText'] as String, note['note'] as String)),
+      highlights.clear();
+      notes.clear();
+
+      // Convertir los highlights cargados al formato TextRange
+      loadedHighlights.forEach((text, color) {
+        int start = widget.text.indexOf(text);
+        if (start != -1) {
+          highlights[TextRange(start: start, end: start + text.length)] = color;
+        }
+      });
+
+      // Cargar las notas
+      notes.addAll(
+        Map.fromEntries(
+          loadedNotes
+              .where((note) =>
+                  note['className'] == widget.className &&
+                  note['isTranscription'] == widget.isTranscription)
+              .map((note) => MapEntry(
+                  note['highlightedText'] as String, note['note'] as String)),
+        ),
       );
     });
   }
 
-  Widget _buildDecoratedText(String text, Color? highlightColor, bool hasNote) {
-    return Stack(
-      children: [
-        Text(
-          text,
-          style: TextStyle(
-            backgroundColor: highlightColor?.withOpacity(0.3),
-            color: Colors.black,
-            height: 1.5,
-          ),
-        ),
-        if (hasNote)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 1,
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.black,
-                    width: 2,
-                    style: BorderStyle.dotted,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _handleDoubleTap(String text) {
+  void _handleDoubleTap(TextRange range) {
     if (_isMenuOpen) return;
 
     _tapTimer?.cancel();
     tapCount++;
 
     if (tapCount == 2) {
-      _showHighlightOptions(text);
+      _showHighlightOptions(range);
       tapCount = 0;
     } else {
       _tapTimer = Timer(const Duration(milliseconds: 300), () {
@@ -125,11 +105,12 @@ class _HighlightedTextState extends State<HighlightedText> {
     }
   }
 
-  void _handleNoteLongPress(String text) {
+  void _handleNoteLongPress(TextRange range) {
     if (_isMenuOpen) return;
 
     _longPressTimer = Timer(const Duration(seconds: 1), () {
-      _showNoteOptions(text);
+      String text = widget.text.substring(range.start, range.end);
+      _showNoteOptions(text, range);
     });
   }
 
@@ -137,25 +118,26 @@ class _HighlightedTextState extends State<HighlightedText> {
     _longPressTimer?.cancel();
   }
 
-  void _showNoteOptions(String text) {
+  void _showNoteOptions(String text, TextRange range) {
     setState(() => _isMenuOpen = true);
 
     if (!context.mounted) return;
-    
+
     showMenu(
       context: context,
       position: const RelativeRect.fromLTRB(100, 100, 0, 0),
       items: [
         PopupMenuItem(
           child: _buildMenuOption(Icons.highlight, 'Agregar resaltado'),
-          onTap: () => _handleHighlight(0, text.length),
+          onTap: () => _handleHighlight(range.start, range.end),
         ),
         PopupMenuItem(
           child: _buildMenuOption(Icons.edit, 'Editar nota'),
           onTap: () => _handleNoteAdd(text),
         ),
         PopupMenuItem(
-          child: _buildMenuOption(Icons.delete, 'Eliminar nota', color: Colors.red),
+          child: _buildMenuOption(Icons.delete, 'Eliminar nota',
+              color: Colors.red),
           onTap: () async {
             await _noteManager.deleteNote(
               widget.className,
@@ -171,7 +153,8 @@ class _HighlightedTextState extends State<HighlightedText> {
       ],
     ).then((_) => setState(() => _isMenuOpen = false));
   }
-   void _handleCopy(String text) {
+
+  void _handleCopy(String text) {
     Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -180,8 +163,6 @@ class _HighlightedTextState extends State<HighlightedText> {
   }
 
   void _handleHighlight(int start, int end) {
-    final selectedText = widget.text.substring(start, end);
-    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) {
@@ -190,13 +171,14 @@ class _HighlightedTextState extends State<HighlightedText> {
           content: ColorPicker(
             onColorSelected: (color) {
               setState(() {
-                highlights[selectedText] = color;
+                TextRange range = TextRange(start: start, end: end);
+                highlights[range] = color;
                 currentHighlightColor = color;
               });
               _noteManager.saveHighlight(
                 widget.className,
                 widget.isTranscription,
-                selectedText,
+                widget.text.substring(start, end),
                 color,
               );
               Navigator.of(context).pop();
@@ -213,25 +195,26 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _showHighlightOptions(String highlightedText) {
+  void _showHighlightOptions(TextRange range) {
     setState(() => _isMenuOpen = true);
+    String text = widget.text.substring(range.start, range.end);
 
     if (!context.mounted) return;
-    
+
     showMenu(
       context: context,
       position: const RelativeRect.fromLTRB(100, 100, 0, 0),
       items: [
         PopupMenuItem(
           child: _buildMenuOption(Icons.content_copy, 'Copiar'),
-          onTap: () => _handleCopy(highlightedText),
+          onTap: () => _handleCopy(text),
         ),
         PopupMenuItem(
           child: _buildMenuOption(Icons.color_lens, 'Cambiar color'),
           onTap: () {
             Future.delayed(
               const Duration(seconds: 0),
-              () => _showColorPickerDialog(highlightedText),
+              () => _showColorPickerDialog(range),
             );
           },
         ),
@@ -240,13 +223,14 @@ class _HighlightedTextState extends State<HighlightedText> {
           onTap: () {
             Future.delayed(
               const Duration(seconds: 0),
-              () => _handleNoteAdd(highlightedText),
+              () => _handleNoteAdd(text),
             );
           },
         ),
         PopupMenuItem(
-          child: _buildMenuOption(Icons.delete, 'Eliminar resaltado', color: Colors.red),
-          onTap: () => _removeHighlight(highlightedText),
+          child: _buildMenuOption(Icons.delete, 'Eliminar resaltado',
+              color: Colors.red),
+          onTap: () => _removeHighlight(range),
         ),
       ],
     ).then((_) => setState(() => _isMenuOpen = false));
@@ -262,7 +246,7 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _showColorPickerDialog(String highlightedText) {
+  void _showColorPickerDialog(TextRange range) {
     if (!context.mounted) return;
     showDialog(
       context: context,
@@ -271,12 +255,12 @@ class _HighlightedTextState extends State<HighlightedText> {
         content: ColorPicker(
           onColorSelected: (color) {
             setState(() {
-              highlights[highlightedText] = color;
+              highlights[range] = color;
             });
             _noteManager.saveHighlight(
               widget.className,
               widget.isTranscription,
-              highlightedText,
+              widget.text.substring(range.start, range.end),
               color,
             );
             Navigator.of(context).pop();
@@ -292,9 +276,10 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _removeHighlight(String text) {
+  void _removeHighlight(TextRange range) {
+    String text = widget.text.substring(range.start, range.end);
     setState(() {
-      highlights.remove(text);
+      highlights.remove(range);
     });
     _noteManager.removeHighlight(
       widget.className,
@@ -386,14 +371,14 @@ class _HighlightedTextState extends State<HighlightedText> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
+                        onPressed: () => Navigator.pop(context, false),
                         child: const Text('Cancelar'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: () {
                           if (textController.text.isNotEmpty) {
-                            Navigator.of(context).pop(true);
+                            Navigator.pop(context, true);
                           }
                         },
                         child: const Text('Guardar'),
@@ -418,10 +403,12 @@ class _HighlightedTextState extends State<HighlightedText> {
 
       if (!mounted) return;
 
-      await _loadData();
-      
+      setState(() {
+        notes[text] = textController.text;
+      });
+
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nota guardada')),
       );
@@ -430,83 +417,68 @@ class _HighlightedTextState extends State<HighlightedText> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        SelectableText.rich(
-          TextSpan(
-            children: _buildTextSpans(),
-          ),
-          selectionControls: customControls,
-        ),
-      ],
+    return SelectableText.rich(
+      TextSpan(
+        children: _buildTextSpans(),
+      ),
+      selectionControls: customControls,
     );
   }
 
   List<TextSpan> _buildTextSpans() {
+    if (highlights.isEmpty) {
+      return [TextSpan(text: widget.text)];
+    }
+
     List<TextSpan> spans = [];
-    String remainingText = widget.text;
+    int currentIndex = 0;
 
-    while (remainingText.isNotEmpty) {
-      bool foundHighlight = false;
-      String? highlightedText;
-      Color? highlightColor;
+    var sortedRanges = highlights.keys.toList()
+      ..sort((a, b) => a.start.compareTo(b.start));
 
-      for (var entry in highlights.entries) {
-        int index = remainingText.indexOf(entry.key);
-        if (index == 0) {
-          highlightedText = entry.key;
-          highlightColor = entry.value;
-          foundHighlight = true;
-          break;
-        }
+    for (var range in sortedRanges) {
+      if (currentIndex < range.start) {
+        spans.add(TextSpan(
+          text: widget.text.substring(currentIndex, range.start),
+        ));
       }
 
-      if (foundHighlight && highlightedText != null) {
-        final currentText = highlightedText;
-        final hasNote = notes.containsKey(currentText);
-        
-        spans.add(TextSpan(
-          text: currentText,
-          style: TextStyle(color: Colors.black),
-          children: [WidgetSpan(
-            child: _buildDecoratedText(currentText, highlightColor, hasNote),
-          )],
-          recognizer: TapGestureRecognizer()
-            ..onTapDown = (details) {
-              if (hasNote) {
-                _handleNoteLongPress(currentText);
-              }
+      final text = widget.text.substring(range.start, range.end);
+      final hasNote = notes.containsKey(text);
+
+      spans.add(TextSpan(
+        text: text,
+        style: TextStyle(
+          backgroundColor: highlights[range]?.withOpacity(0.3),
+          decoration: hasNote ? TextDecoration.underline : null,
+          decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
+          decorationColor: Colors.black,
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (details) {
+            if (hasNote) {
+              _handleNoteLongPress(range);
             }
-            ..onTapUp = (details) {
-              if (hasNote) {
-                _handleNoteRelease();
-              } else {
-                _handleDoubleTap(currentText);
-              }
-            }
-            ..onTapCancel = () {
-              _handleNoteRelease();
-            },
-        ));
-        remainingText = remainingText.substring(currentText.length);
-      } else {
-        int nextHighlightIndex = remainingText.length;
-        for (var text in highlights.keys) {
-          int index = remainingText.indexOf(text);
-          if (index > 0 && index < nextHighlightIndex) {
-            nextHighlightIndex = index;
           }
-        }
+          ..onTapUp = (details) {
+            if (hasNote) {
+              _handleNoteRelease();
+            } else {
+              _handleDoubleTap(range);
+            }
+          }
+          ..onTapCancel = () {
+            _handleNoteRelease();
+          },
+      ));
 
-        spans.add(TextSpan(
-          text: remainingText.substring(0, nextHighlightIndex),
-          style: const TextStyle(
-            height: 1.5,
-            color: Colors.black,
-          ),
-        ));
-        remainingText = remainingText.substring(nextHighlightIndex);
-      }
+      currentIndex = range.end;
+    }
+
+    if (currentIndex < widget.text.length) {
+      spans.add(TextSpan(
+        text: widget.text.substring(currentIndex),
+      ));
     }
 
     return spans;
