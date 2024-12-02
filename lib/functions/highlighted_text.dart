@@ -168,79 +168,184 @@ class _HighlightedTextState extends State<HighlightedText> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Capa 1: Resaltados
-        Positioned.fill(
-          child: CustomPaint(
-            painter: HighlightPainter(
-              highlights: highlights,
-              textStyle: DefaultTextStyle.of(context).style,
-            ),
-          ),
-        ),
-
-        // Capa 2: Texto principal y subrayados de notas
+        // Capa base con el texto
         SelectableText.rich(
           TextSpan(
             children: _buildTextSpans(),
           ),
           selectionControls: customControls,
         ),
+
+        // Capa de resaltados
+        if (highlights.isNotEmpty)
+          CustomPaint(
+            painter: HighlightPainter(
+              highlights: highlights,
+              textStyle: DefaultTextStyle.of(context).style,
+              context: context,
+            ),
+            size: Size.infinite,
+          ),
       ],
     );
   }
 
-  List<TextSpan> _buildTextSpans() {
-  List<TextSpan> spans = [];
-  int currentIndex = 0;
-  final allRanges = _getAllRanges();
+//   List<TextSpan> _buildTextSpans() {
+//   List<TextSpan> spans = [];
+//   int currentIndex = 0;
+//   final allRanges = _getAllRanges();
 
-  for (var range in allRanges) {
-    if (currentIndex < range.start) {
-      spans.add(
-          TextSpan(text: widget.text.substring(currentIndex, range.start)));
+//   for (var range in allRanges) {
+//     if (currentIndex < range.start) {
+//       spans.add(
+//           TextSpan(text: widget.text.substring(currentIndex, range.start)));
+//     }
+
+//     final hasNote = notes.any((note) =>
+//         note.startPosition == range.start && note.endPosition == range.end);
+
+//     spans.add(TextSpan(
+//       text: widget.text.substring(range.start, range.end),
+//       style: TextStyle(
+//         decoration: hasNote ? TextDecoration.underline : null,
+//         decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
+//         decorationColor: Colors.black,
+//         decorationThickness: 2,
+//       ),
+//       recognizer: TapGestureRecognizer()
+//         ..onTapDown = (details) {
+//           _handleTapDown(details, range);
+//         },
+//     ));
+
+//     spans.add(TextSpan(
+//       text: widget.text.substring(range.start, range.end),
+//       style: TextStyle(
+//         decoration: hasNote ? TextDecoration.underline : null,
+//         decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
+//         decorationColor: Colors.black,
+//         decorationThickness: 2,
+//       ),
+//       recognizer: LongPressGestureRecognizer()
+//         ..onLongPress = () {
+//           _handleLongPress(range);
+//         },
+//     ));
+
+//     currentIndex = range.end;
+//   }
+
+//   if (currentIndex < widget.text.length) {
+//     spans.add(TextSpan(text: widget.text.substring(currentIndex)));
+//   }
+
+//   return spans;
+// }
+
+  // List<TextSpan> _buildTextSpans() {
+  //   List<TextSpan> spans = [];
+  //   int currentIndex = 0;
+  //   final allRanges = _getAllRanges();
+
+  //   for (var range in allRanges) {
+  //     // Agregar el texto antes del rango actual
+  //     if (currentIndex < range.start) {
+  //       spans.add(
+  //           TextSpan(text: widget.text.substring(currentIndex, range.start)));
+  //     }
+
+  //     // Verificar si hay una nota en este rango
+  //     final hasNote = notes.any((note) =>
+  //         note.startPosition == range.start && note.endPosition == range.end);
+
+  //     // Verificar si hay un resaltado en este rango
+  //     final highlight = highlights.firstWhere(
+  //       (h) => h.startPosition == range.start && h.endPosition == range.end,
+  //       orElse: () => null,
+  //     );
+
+  //     // Crear el TextSpan para el rango actual
+  //     spans.add(TextSpan(
+  //       text: widget.text.substring(range.start, range.end),
+  //       style: TextStyle(
+  //         backgroundColor: highlight.color.withOpacity(0.3),
+  //         decoration: hasNote ? TextDecoration.underline : null,
+  //         decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
+  //         decorationColor: Colors.black,
+  //         decorationThickness: 2,
+  //       ),
+  //       recognizer: TapGestureRecognizer()
+  //         ..onTap = () {
+  //           // Manejar el tap si es necesario
+  //           _handleLongPress(range);
+  //         },
+  //     ));
+
+  //     currentIndex = range.end;
+  //   }
+
+  //   // Agregar el texto restante después del último rango
+  //   if (currentIndex < widget.text.length) {
+  //     spans.add(TextSpan(text: widget.text.substring(currentIndex)));
+  //   }
+
+  //   return spans;
+  // }
+
+  List<TextSpan> _buildTextSpans() {
+    List<TextSpan> spans = [];
+    int currentIndex = 0;
+    final allRanges = _getAllRanges();
+
+    for (var range in allRanges) {
+      // Agregar el texto antes del rango actual
+      if (currentIndex < range.start) {
+        spans.add(
+            TextSpan(text: widget.text.substring(currentIndex, range.start)));
+      }
+
+      // Verificar si hay una nota en este rango
+      final hasNote = notes.any((note) =>
+          note.startPosition == range.start && note.endPosition == range.end);
+
+      // Verificar si hay un resaltado en este rango
+      final highlight = highlights.cast<HighlightData?>().firstWhere(
+            (h) =>
+                h != null &&
+                h.startPosition == range.start &&
+                h.endPosition == range.end,
+            orElse: () => null,
+          );
+
+      // Crear el TextSpan para el rango actual
+      spans.add(TextSpan(
+        text: widget.text.substring(range.start, range.end),
+        style: TextStyle(
+          backgroundColor: highlight?.color.withOpacity(0.3),
+          decoration: hasNote ? TextDecoration.underline : null,
+          decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
+          decorationColor: Colors.black,
+          decorationThickness: 2,
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTap = () {
+            // Manejar el tap si es necesario
+            if (highlight != null) {
+              _handleTapDown(TapDownDetails(), range);
+            }
+          },
+      ));
+
+      currentIndex = range.end;
     }
 
-    final hasNote = notes.any((note) =>
-        note.startPosition == range.start && note.endPosition == range.end);
+    // Agregar el texto restante después del último rango
+    if (currentIndex < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(currentIndex)));
+    }
 
-    spans.add(TextSpan(
-      text: widget.text.substring(range.start, range.end),
-      style: TextStyle(
-        decoration: hasNote ? TextDecoration.underline : null,
-        decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
-        decorationColor: Colors.black,
-        decorationThickness: 2,
-      ),
-      recognizer: TapGestureRecognizer()
-        ..onTapDown = (details) {
-          _handleTapDown(details, range);
-        },
-    ));
-
-    spans.add(TextSpan(
-      text: widget.text.substring(range.start, range.end),
-      style: TextStyle(
-        decoration: hasNote ? TextDecoration.underline : null,
-        decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
-        decorationColor: Colors.black,
-        decorationThickness: 2,
-      ),
-      recognizer: LongPressGestureRecognizer()
-        ..onLongPress = () {
-          _handleLongPress(range);
-        },
-    ));
-
-    currentIndex = range.end;
+    return spans;
   }
-
-  if (currentIndex < widget.text.length) {
-    spans.add(TextSpan(text: widget.text.substring(currentIndex)));
-  }
-
-  return spans;
-}
-
 
   List<TextRange> _getAllRanges() {
     final Set<TextRange> ranges = {};
@@ -423,10 +528,12 @@ class _HighlightedTextState extends State<HighlightedText> {
 class HighlightPainter extends CustomPainter {
   final List<HighlightData> highlights;
   final TextStyle textStyle;
+  final BuildContext context;
 
   HighlightPainter({
     required this.highlights,
     required this.textStyle,
+    required this.context,
   });
 
   @override
@@ -436,6 +543,25 @@ class HighlightPainter extends CustomPainter {
     for (var highlight in highlights) {
       paint.color = highlight.color.withOpacity(0.3);
       // Implementar la lógica de pintura del resaltado
+      // Calcular la posición del texto resaltado
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: highlight.text,
+          style: textStyle,
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      // Dibujar el resaltado
+      final rect = Rect.fromLTWH(
+        0, // Posición X
+        highlight.startPosition.toDouble(), // Posición Y
+        textPainter.width, // Ancho
+        textPainter.height, // Alto
+      );
+
+      canvas.drawRect(rect, paint);
     }
   }
 
