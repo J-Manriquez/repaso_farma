@@ -883,7 +883,8 @@ Explicación: Aseguran que los medicamentos mantengan sus propiedades hasta su d
 Conclusión
 
 Esta clase ha proporcionado una visión detallada y estructurada sobre el funcionamiento de las farmacias y otros establecimientos farmacéuticos en Chile, resaltando la importancia de cumplir con las normativas vigentes para garantizar la seguridad y bienestar de los pacientes. Al entender las responsabilidades y funciones de cada profesional dentro de la farmacia, así como las regulaciones que rigen la manipulación y dispensación de medicamentos, estamos mejor preparados para ofrecer un servicio de calidad y contribuir positivamente a la salud pública. Continuemos profundizando en estos conocimientos y aplicándolos en nuestra práctica diaria.
-      '''
+      ''',
+      'videoId': '7lLEQjvcTbY',
     },
     'Clase 3': {
       'transcription': '''
@@ -1648,7 +1649,8 @@ Conclusión
 A lo largo de esta clase, hemos explorado los fundamentos de los medicamentos, desde sus componentes esenciales hasta las formas en que se presentan y administran. Comprender la diferencia entre principio activo y excipiente, las diversas formas farmacéuticas y las vías de administración es crucial para garantizar un uso seguro y eficaz de los medicamentos. Además, el conocimiento de los medicamentos de venta directa y su correcta utilización contribuye al autocuidado responsable y previene posibles riesgos asociados con su uso inapropiado.
 
 Es fundamental seguir profundizando en estos temas, relacionando los conceptos y aplicándolos en situaciones prácticas para consolidar el aprendizaje y estar mejor preparados en el ámbito de la salud y el bienestar.
-      '''
+      ''',
+      'videoId': '5feLV-3u6o0', //
     },
     'Clase 4': {
       'transcription': '''
@@ -2250,7 +2252,8 @@ Siempre verificar las dosis y las unidades de medida.
 Conocer las indicaciones y contraindicaciones de cada medicamento.
 Mantenerse actualizado sobre las regulaciones y novedades farmacéuticas.
 Educar a los pacientes sobre el uso correcto de los medicamentos y la importancia de seguir las indicaciones médicas.
-      '''
+      ''',
+      'videoId': '0q30xSmj9b0', //
     },
     'Clase Repaso': {
       'transcription': '''
@@ -3422,7 +3425,8 @@ Conclusión
 
 Repasar y comprender estos conceptos es fundamental para el desempeño seguro y eficiente en el ámbito farmacéutico. Es importante continuar estudiando, aclarando dudas y aplicando estos conocimientos en situaciones prácticas para garantizar una atención de calidad a los pacientes y cumplir con las normativas sanitarias.
 
-      '''
+      ''',
+      'videoId': 'hS1HWwhZZWM', //
     },
     // Aquí puedes agregar el contenido de las otras clases siguiendo el mismo formato
   };
@@ -3434,5 +3438,9 @@ Repasar y comprender estos conceptos es fundamental para el desempeño seguro y 
 
   static String getReview(String className) {
     return content[className]?['review'] ?? 'Contenido de repaso no disponible';
+  }
+
+  static String getVideoId(String className) {
+    return content[className]?['videoId'] ?? '';
   }
 }

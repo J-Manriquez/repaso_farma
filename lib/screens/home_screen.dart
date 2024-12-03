@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:repaso_farma/screens/clase_screen.dart';
+import 'package:repaso_farma/screens/evaluacion_general_screen.dart';
 
 class ClassesScreen extends StatelessWidget {
   const ClassesScreen({super.key});
@@ -79,6 +80,30 @@ class ClassesScreen extends StatelessWidget {
                 child: const Text(
                   'Clase Repaso',
                   style: TextStyle(fontSize: 18),
+                ),
+              ),
+              const SizedBox(height: 60), // Espacio adicional para separar
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EvaluacionGeneralScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      Colors.orange, // Color diferente para destacar
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                ),
+                child: const Text(
+                  'Evaluación General',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],

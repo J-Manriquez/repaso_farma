@@ -5,6 +5,7 @@ import 'package:repaso_farma/screens/gallery_screen.dart';
 import 'package:repaso_farma/screens/notes_screen.dart';
 import 'package:repaso_farma/managers/test_clase_manager.dart';
 import 'package:repaso_farma/screens/test_clase_screen.dart';
+import 'package:repaso_farma/screens/video_player_screen.dart';
 import 'transcip_review_screen.dart';
 
 class ClassDetailScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     'Transcripción de la Clase',
     'Repaso de la Clase',
     'Material Visual',
+    'Video de la Clase',
     'Test',
   ];
 
@@ -108,6 +110,17 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
         );
       case 'Material Visual':
         return GalleryScreen(className: widget.className);
+      case 'Video de la Clase': // Agregar este caso
+        final videoId = ClassContent.getVideoId(widget.className);
+        if (videoId.isEmpty) {
+          return const Center(
+            child: Text('No hay video disponible para esta clase'),
+          );
+        }
+        return VideoPlayerScreen(
+          className: widget.className,
+          videoId: videoId,
+        );
       case 'Test':
         return TestScreen(className: widget.className);
       default:

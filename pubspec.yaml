@@ -11,12 +11,16 @@ dependencies:
     sdk: flutter
   path_provider: ^2.1.5
   shared_preferences: ^2.0.0
+  youtube_player_flutter: ^9.1.1
+  url_launcher: ^6.1.10
+  youtube_player_iframe: ^5.2.1
+  pod_player: ^0.2.1
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
