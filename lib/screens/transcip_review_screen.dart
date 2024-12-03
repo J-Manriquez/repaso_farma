@@ -89,16 +89,13 @@ class _HighlightedTextState extends State<HighlightedText> {
         }
       });
 
-      notes.addAll(
-        Map.fromEntries(
-          loadedNotes
-              .where((note) =>
-                  note['className'] == widget.className &&
-                  note['isTranscription'] == widget.isTranscription)
-              .map((note) => MapEntry(
-                  note['highlightedText'] as String, note['note'] as String)),
-        ),
-      );
+      // Filtrar y cargar solo las notas correspondientes a esta vista
+      for (var note in loadedNotes) {
+        if (note['className'] == widget.className &&
+            note['isTranscription'] == widget.isTranscription) {
+          notes[note['highlightedText'] as String] = note['note'] as String;
+        }
+      }
     });
   }
 
@@ -511,12 +508,13 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
 
     if (result == true && textController.text.isNotEmpty) {
-      await _noteManager.saveNote(
-        widget.className,
-        text,
-        textController.text,
-        widget.isTranscription,
-      );
+      await _noteManager.saveNote({
+        'className': widget.className,
+        'highlightedText': text,
+        'note': textController.text,
+        'isTranscription': widget.isTranscription,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
       if (!mounted) return;
 
@@ -550,92 +548,76 @@ class _HighlightedTextState extends State<HighlightedText> {
     List<TextSpan> spans = [];
     int currentIndex = 0;
 
-    // Crear una lista de todos los rangos que necesitan procesamiento
-    List<Map<String, dynamic>> allRanges = [];
+    // Crear una estructura de datos para todos los rangos de texto que necesitan procesamiento
+    Map<int, Map<String, dynamic>> positionMap = {};
 
-    // Agregar rangos de resaltados
+    // Procesar highlights
     highlights.forEach((text, highlightData) {
-      allRanges.add({
-        'range': highlightData.range,
-        'color': highlightData.color,
-        'text': text,
-        'type': 'highlight',
-        'isTranscription': highlightData.isTranscription,
-      });
-    });
-
-    // Agregar rangos de notas que no tienen resaltado
-    notes.forEach((text, note) {
       int start = widget.text.indexOf(text);
       if (start != -1) {
-        // Verificar si este texto ya está incluido en un resaltado
-        bool isAlreadyHighlighted = allRanges.any((rangeData) {
-          TextRange range = rangeData['range'] as TextRange;
-          return range.start <= start && range.end >= start + text.length;
-        });
-
-        if (!isAlreadyHighlighted) {
-          allRanges.add({
-            'range': TextRange(start: start, end: start + text.length),
-            'text': text,
-            'type': 'note'
-          });
-        }
+        positionMap[start] = {
+          'text': text,
+          'end': start + text.length,
+          'color': highlightData.color,
+          'hasHighlight': true,
+          'hasNote': notes.containsKey(text),
+        };
       }
     });
 
-    // Ordenar rangos por posición
-    allRanges.sort((a, b) =>
-        (a['range'] as TextRange).start.compareTo((b['range'] as TextRange).start));
+    // Procesar notas sin resaltado
+    notes.forEach((text, note) {
+      int start = widget.text.indexOf(text);
+      if (start != -1 && !positionMap.containsKey(start)) {
+        positionMap[start] = {
+          'text': text,
+          'end': start + text.length,
+          'hasHighlight': false,
+          'hasNote': true,
+        };
+      }
+    });
 
-    for (var rangeData in allRanges) {
-      final TextRange range = rangeData['range'] as TextRange;
-      final String text = rangeData['text'] as String;
-      final String type = rangeData['type'] as String;
+    // Obtener todas las posiciones ordenadas
+    List<int> positions = positionMap.keys.toList()..sort();
 
-      if (currentIndex < range.start) {
+    // Construir los spans
+    for (int i = 0; i < positions.length; i++) {
+      int position = positions[i];
+
+      // Agregar texto normal antes del siguiente elemento
+      if (currentIndex < position) {
         spans.add(TextSpan(
-          text: widget.text.substring(currentIndex, range.start),
+          text: widget.text.substring(currentIndex, position),
         ));
       }
 
-      final bool hasNote = notes.containsKey(text);
-      final bool hasHighlight = type == 'highlight';
+      var data = positionMap[position]!;
+      String text = data['text'] as String;
+      bool hasHighlight = data['hasHighlight'] as bool;
+      bool hasNote = data['hasNote'] as bool;
 
-      if (hasHighlight) {
-        // Solo mostrar el resaltado si corresponde al tipo correcto (transcripción/repaso)
-        bool shouldShowHighlight =
-            rangeData['isTranscription'] == widget.isTranscription;
+      spans.add(TextSpan(
+        text: text,
+        style: TextStyle(
+          backgroundColor:
+              hasHighlight ? (data['color'] as Color).withOpacity(0.3) : null,
+          decoration: hasNote ? TextDecoration.underline : null,
+          decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
+          decorationColor: Colors.black,
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTapDown = (details) => _handleTapDown(
+                details,
+                TextRange(start: position, end: data['end'] as int),
+                text,
+              ),
+      ));
 
-        spans.add(TextSpan(
-          text: text,
-          style: TextStyle(
-            backgroundColor: shouldShowHighlight
-                ? (rangeData['color'] as Color).withOpacity(0.3)
-                : null,
-            decoration: hasNote ? TextDecoration.underline : null,
-            decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
-            decorationColor: Colors.black,
-          ),
-          recognizer: TapGestureRecognizer()
-            ..onTapDown = (details) => _handleTapDown(details, range, text),
-        ));
-      } else {
-        spans.add(TextSpan(
-          text: text,
-          style: TextStyle(
-            decoration: hasNote ? TextDecoration.underline : null,
-            decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
-            decorationColor: Colors.black,
-          ),
-          recognizer: TapGestureRecognizer()
-            ..onTapDown = (details) => _handleTapDown(details, range, text),
-        ));
-      }
-
-      currentIndex = range.end;
+      currentIndex = data['end'] as int;
     }
 
+    // Agregar el texto restante después del último elemento
     if (currentIndex < widget.text.length) {
       spans.add(TextSpan(
         text: widget.text.substring(currentIndex),

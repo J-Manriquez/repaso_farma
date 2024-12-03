@@ -8,19 +8,8 @@ class NoteManager {
   static const String _notesKey = 'class_notes';
   static const String _highlightsKey = 'class_highlights';
 
-  Future<void> saveNote(
-    String className,
-    String highlightedText,
-    String note,
-    bool isTranscription,
-  ) async {
-    await _storage.saveNote({
-      'className': className,
-      'highlightedText': highlightedText,
-      'note': note,
-      'isTranscription': isTranscription,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+  Future<void> saveNote(Map<String, dynamic> noteData) async {
+    await _storage.saveNote(noteData);
   }
 
   Future<void> saveHighlight(
