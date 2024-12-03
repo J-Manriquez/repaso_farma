@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
-import 'package:repaso_farma/class_screens/full_screen_image.dart';
+import 'package:repaso_farma/screens/full_screen_image.dart';
 
 class GalleryScreen extends StatefulWidget {
   final String className;

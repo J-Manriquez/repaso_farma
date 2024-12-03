@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:repaso_farma/class_screens/storage_manager.dart';
+import 'package:repaso_farma/managers/storage_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NoteManager {
@@ -22,6 +22,7 @@ class NoteManager {
       'timestamp': DateTime.now().toIso8601String(),
     });
   }
+  
 
   Future<void> saveHighlight(
     String className,

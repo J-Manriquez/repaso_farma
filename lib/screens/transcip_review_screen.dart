@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
-import 'text_selection_controls.dart';
-import 'package:repaso_farma/class_screens/highlight_colors.dart';
-import 'note_manager.dart';
-import 'color_picker.dart';
+import '../managers/text_selection_manager.dart';
+import 'package:repaso_farma/managers/highlight_colors_manager.dart';
+import '../managers/note_manager.dart';
+import '../widgets/color_picker.dart';
 import 'dart:async';
 
 class HighlightedText extends StatefulWidget {
@@ -31,9 +31,9 @@ class _HighlightedTextState extends State<HighlightedText> {
   Color currentHighlightColor = HighlightColors.colors[0];
   TextRange? selectedHighlight;
   String? selectedText;
-  int tapCount = 0;
-  Timer? _tapTimer;
-  Timer? _longPressTimer;
+  Timer? _doubleTapTimer;
+  int _tapCount = 0;
+  Offset _tapPosition = Offset.zero;
   bool _isMenuOpen = false;
 
   @override
@@ -49,8 +49,7 @@ class _HighlightedTextState extends State<HighlightedText> {
 
   @override
   void dispose() {
-    _tapTimer?.cancel();
-    _longPressTimer?.cancel();
+    _doubleTapTimer?.cancel();
     super.dispose();
   }
 
@@ -67,7 +66,6 @@ class _HighlightedTextState extends State<HighlightedText> {
       highlights.clear();
       notes.clear();
 
-      // Convertir los highlights cargados al formato TextRange
       loadedHighlights.forEach((text, color) {
         int start = widget.text.indexOf(text);
         if (start != -1) {
@@ -75,7 +73,6 @@ class _HighlightedTextState extends State<HighlightedText> {
         }
       });
 
-      // Cargar las notas
       notes.addAll(
         Map.fromEntries(
           loadedNotes
@@ -89,69 +86,149 @@ class _HighlightedTextState extends State<HighlightedText> {
     });
   }
 
-  void _handleDoubleTap(TextRange range) {
+  void _handleTapDown(TapDownDetails details, TextRange range, String text) {
     if (_isMenuOpen) return;
 
-    _tapTimer?.cancel();
-    tapCount++;
+    setState(() {
+      _tapPosition = details.globalPosition;
+      _tapCount++;
+    });
 
-    if (tapCount == 2) {
-      _showHighlightOptions(range);
-      tapCount = 0;
-    } else {
-      _tapTimer = Timer(const Duration(milliseconds: 300), () {
-        tapCount = 0;
+    if (_tapCount == 1) {
+      _doubleTapTimer?.cancel();
+      _doubleTapTimer = Timer(const Duration(milliseconds: 300), () {
+        setState(() {
+          _tapCount = 0;
+        });
       });
+    } else if (_tapCount == 2) {
+      _doubleTapTimer?.cancel();
+      setState(() {
+        _tapCount = 0;
+      });
+      _showContextMenu(range, text);
     }
   }
 
-  void _handleNoteLongPress(TextRange range) {
-    if (_isMenuOpen) return;
-
-    _longPressTimer = Timer(const Duration(seconds: 1), () {
-      String text = widget.text.substring(range.start, range.end);
-      _showNoteOptions(text, range);
-    });
-  }
-
-  void _handleNoteRelease() {
-    _longPressTimer?.cancel();
-  }
-
-  void _showNoteOptions(String text, TextRange range) {
+  void _showContextMenu(TextRange range, String text) {
     setState(() => _isMenuOpen = true);
 
-    if (!context.mounted) return;
+    final bool hasNote = notes.containsKey(text);
+    final bool hasHighlight = highlights.containsKey(range);
+
+    final RenderBox overlay = Overlay.of(context)
+        .context
+        .findRenderObject() as RenderBox;
+
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromLTWH(_tapPosition.dx, _tapPosition.dy, 0, 0),
+      Offset.zero & overlay.size,
+    );
 
     showMenu(
       context: context,
-      position: const RelativeRect.fromLTRB(100, 100, 0, 0),
-      items: [
+      position: position,
+      items: _buildMenuItems(range, text, hasNote, hasHighlight),
+    ).then((_) => setState(() => _isMenuOpen = false));
+  }
+
+  List<PopupMenuEntry> _buildMenuItems(
+    TextRange range,
+    String text,
+    bool hasNote,
+    bool hasHighlight,
+  ) {
+    List<PopupMenuEntry> items = [];
+
+    if (hasNote) {
+      items.addAll([
         PopupMenuItem(
-          child: _buildMenuOption(Icons.highlight, 'Agregar resaltado'),
-          onTap: () => _handleHighlight(range.start, range.end),
+          child: _buildMenuOption(Icons.visibility, 'Ver nota'),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _viewNote(text),
+          ),
         ),
         PopupMenuItem(
           child: _buildMenuOption(Icons.edit, 'Editar nota'),
-          onTap: () => _handleNoteAdd(text),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _handleNoteAdd(text),
+          ),
         ),
         PopupMenuItem(
-          child: _buildMenuOption(Icons.delete, 'Eliminar nota',
-              color: Colors.red),
-          onTap: () async {
-            await _noteManager.deleteNote(
-              widget.className,
-              text,
-              widget.isTranscription,
-            );
-            if (!mounted) return;
-            setState(() {
-              notes.remove(text);
-            });
-          },
+          child: _buildMenuOption(
+            Icons.delete_outline,
+            'Eliminar nota',
+            color: Colors.red,
+          ),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _deleteNote(text),
+          ),
         ),
+        const PopupMenuDivider(),
+      ]);
+    }
+
+    if (hasHighlight) {
+      items.add(
+        PopupMenuItem(
+          child: _buildMenuOption(Icons.color_lens, 'Cambiar color'),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _showColorPickerDialog(range),
+          ),
+        ),
+      );
+      items.add(
+        PopupMenuItem(
+          child: _buildMenuOption(
+            Icons.highlight_off,
+            'Eliminar resaltado',
+            color: Colors.red,
+          ),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _removeHighlight(range),
+          ),
+        ),
+      );
+    } else {
+      items.add(
+        PopupMenuItem(
+          child: _buildMenuOption(Icons.highlight, 'Agregar resaltado'),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _handleHighlight(range.start, range.end),
+          ),
+        ),
+      );
+    }
+
+    if (!hasNote) {
+      items.add(
+        PopupMenuItem(
+          child: _buildMenuOption(Icons.note_add, 'Agregar nota'),
+          onTap: () => Future.delayed(
+            const Duration(seconds: 0),
+            () => _handleNoteAdd(text),
+          ),
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  Widget _buildMenuOption(IconData icon, String text, {Color? color}) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 8),
+        Text(text, style: TextStyle(color: color)),
       ],
-    ).then((_) => setState(() => _isMenuOpen = false));
+    );
   }
 
   void _handleCopy(String text) {
@@ -195,59 +272,68 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _showHighlightOptions(TextRange range) {
-    setState(() => _isMenuOpen = true);
-    String text = widget.text.substring(range.start, range.end);
-
-    if (!context.mounted) return;
-
-    showMenu(
-      context: context,
-      position: const RelativeRect.fromLTRB(100, 100, 0, 0),
-      items: [
-        PopupMenuItem(
-          child: _buildMenuOption(Icons.content_copy, 'Copiar'),
-          onTap: () => _handleCopy(text),
+  void _viewNote(String text) {
+    if (notes.containsKey(text)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Nota'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Texto resaltado:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(text),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nota:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(notes[text]!),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
         ),
-        PopupMenuItem(
-          child: _buildMenuOption(Icons.color_lens, 'Cambiar color'),
-          onTap: () {
-            Future.delayed(
-              const Duration(seconds: 0),
-              () => _showColorPickerDialog(range),
-            );
-          },
-        ),
-        PopupMenuItem(
-          child: _buildMenuOption(Icons.note_add, 'Agregar nota'),
-          onTap: () {
-            Future.delayed(
-              const Duration(seconds: 0),
-              () => _handleNoteAdd(text),
-            );
-          },
-        ),
-        PopupMenuItem(
-          child: _buildMenuOption(Icons.delete, 'Eliminar resaltado',
-              color: Colors.red),
-          onTap: () => _removeHighlight(range),
-        ),
-      ],
-    ).then((_) => setState(() => _isMenuOpen = false));
+      );
+    }
   }
 
-  Widget _buildMenuOption(IconData icon, String text, {Color? color}) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 8),
-        Text(text, style: TextStyle(color: color)),
-      ],
+  void _deleteNote(String text) async {
+    await _noteManager.deleteNote(
+      widget.className,
+      text,
+      widget.isTranscription,
+    );
+    if (!mounted) return;
+    setState(() {
+      notes.remove(text);
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Nota eliminada')),
     );
   }
 
   void _showColorPickerDialog(TextRange range) {
-    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -426,50 +512,75 @@ class _HighlightedTextState extends State<HighlightedText> {
   }
 
   List<TextSpan> _buildTextSpans() {
-    if (highlights.isEmpty) {
+    if (highlights.isEmpty && notes.isEmpty) {
       return [TextSpan(text: widget.text)];
     }
 
     List<TextSpan> spans = [];
     int currentIndex = 0;
 
-    var sortedRanges = highlights.keys.toList()
-      ..sort((a, b) => a.start.compareTo(b.start));
+    // Crear una lista de todos los rangos que necesitan procesamiento
+    List<Map<String, dynamic>> allRanges = [];
 
-    for (var range in sortedRanges) {
+    // Agregar rangos de resaltados
+    highlights.forEach((range, color) {
+      allRanges.add({
+        'range': range,
+        'color': color,
+        'text': widget.text.substring(range.start, range.end),
+        'type': 'highlight'
+      });
+    });
+
+    // Agregar rangos de notas que no tienen resaltado
+    notes.forEach((text, note) {
+      int start = widget.text.indexOf(text);
+      if (start != -1) {
+        // Verificar si este texto ya está incluido en un resaltado
+        bool isAlreadyHighlighted = allRanges.any((rangeData) {
+          TextRange range = rangeData['range'] as TextRange;
+          return range.start <= start && range.end >= start + text.length;
+        });
+
+        if (!isAlreadyHighlighted) {
+          allRanges.add({
+            'range': TextRange(start: start, end: start + text.length),
+            'text': text,
+            'type': 'note'
+          });
+        }
+      }
+    });
+
+    // Ordenar rangos por posición
+    allRanges.sort((a, b) => (a['range'] as TextRange).start.compareTo((b['range'] as TextRange).start));
+
+    for (var rangeData in allRanges) {
+      final TextRange range = rangeData['range'] as TextRange;
+      final String text = rangeData['text'] as String;
+      final String type = rangeData['type'] as String;
+
       if (currentIndex < range.start) {
         spans.add(TextSpan(
           text: widget.text.substring(currentIndex, range.start),
         ));
       }
 
-      final text = widget.text.substring(range.start, range.end);
-      final hasNote = notes.containsKey(text);
+      final bool hasNote = notes.containsKey(text);
+      final bool hasHighlight = type == 'highlight';
 
       spans.add(TextSpan(
         text: text,
         style: TextStyle(
-          backgroundColor: highlights[range]?.withOpacity(0.3),
+          backgroundColor: hasHighlight 
+              ? (rangeData['color'] as Color).withOpacity(0.3) 
+              : null,
           decoration: hasNote ? TextDecoration.underline : null,
           decorationStyle: hasNote ? TextDecorationStyle.dotted : null,
           decorationColor: Colors.black,
         ),
         recognizer: TapGestureRecognizer()
-          ..onTapDown = (details) {
-            if (hasNote) {
-              _handleNoteLongPress(range);
-            }
-          }
-          ..onTapUp = (details) {
-            if (hasNote) {
-              _handleNoteRelease();
-            } else {
-              _handleDoubleTap(range);
-            }
-          }
-          ..onTapCancel = () {
-            _handleNoteRelease();
-          },
+          ..onTapDown = (details) => _handleTapDown(details, range, text),
       ));
 
       currentIndex = range.end;

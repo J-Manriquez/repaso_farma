@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'highlight_colors.dart';
+import '../managers/highlight_colors_manager.dart';
 
 class ColorPicker extends StatelessWidget {
   final Function(Color) onColorSelected;
