@@ -7,18 +7,15 @@ import 'package:flutter/material.dart';
 class StorageManager {
   static const String _fileName = 'app_data.json';
 
-  // Estructura del JSON:
   // {
-  //   "highlights": {
-  //     "className_isTranscription": [
-  //       {
-  //         "text": "texto resaltado",
-  //         "start": 0,
-  //         "end": 10,
-  //         "color": 4294967295
-  //       }
-  //     ]
-  //   },
+  //   "highlights": [
+  //     {
+  //       "className": "Clase 1",
+  //       "text": "texto resaltado",
+  //       "color": 4294967295,
+  //       "isTranscription": true
+  //     }
+  //   ],
   //   "notes": [
   //     {
   //       "className": "Clase 1",
@@ -72,21 +69,29 @@ class StorageManager {
     Color color,
   ) async {
     final data = await loadData();
-    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
 
     if (!data.containsKey('highlights')) {
-      data['highlights'] = {};
+      data['highlights'] = [];
     }
 
-    if (!data['highlights'].containsKey(key)) {
-      data['highlights'][key] = [];
-    }
+    final highlights = data['highlights'] as List;
+    final index = highlights.indexWhere((h) =>
+        h['className'] == className &&
+        h['text'] == text &&
+        h['isTranscription'] == isTranscription);
 
-    // Guardar el texto resaltado en lugar de las posiciones
-    data['highlights'][key].add({
+    final highlightData = {
+      'className': className,
       'text': text,
       'color': color.value,
-    });
+      'isTranscription': isTranscription,
+    };
+
+    if (index != -1) {
+      highlights[index] = highlightData;
+    } else {
+      highlights.add(highlightData);
+    }
 
     await saveData(data);
   }
@@ -99,7 +104,7 @@ class StorageManager {
     Color newColor,
   ) async {
     final data = await loadData();
-    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
+    final key = _getHighlightKey(className, isTranscription);
 
     if (data['highlights'].containsKey(key)) {
       final highlights = data['highlights'][key] as List;
@@ -120,13 +125,22 @@ class StorageManager {
     String text,
   ) async {
     final data = await loadData();
-    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
 
-    if (data['highlights'].containsKey(key)) {
-      final highlights = data['highlights'][key] as List;
-      highlights.removeWhere((h) => h['text'] == text);
+    if (data.containsKey('highlights')) {
+      final highlights = data['highlights'] as List;
+      highlights.removeWhere((h) =>
+          h['className'] == className &&
+          h['text'] == text &&
+          h['isTranscription'] == isTranscription);
       await saveData(data);
     }
+  }
+
+  String _getHighlightKey(String className, bool isTranscription) {
+    // Crear una clave más específica que diferencie claramente entre transcripción y repaso
+    return isTranscription
+        ? '${className}_transcription_highlights'
+        : '${className}_review_highlights';
   }
 
   Future<Map<String, Color>> getHighlights(
@@ -134,18 +148,42 @@ class StorageManager {
     bool isTranscription,
   ) async {
     final data = await loadData();
-    final key = '${className}_${isTranscription ? 'trans' : 'review'}';
-
     Map<String, Color> result = {};
 
-    if (data['highlights'].containsKey(key)) {
-      final highlights = data['highlights'][key] as List;
+    if (data.containsKey('highlights')) {
+      final highlights = data['highlights'] as List;
       for (var highlight in highlights) {
-        result[highlight['text'] as String] = Color(highlight['color'] as int);
+        if (highlight['className'] == className &&
+            highlight['isTranscription'] == isTranscription) {
+          result[highlight['text'] as String] =
+              Color(highlight['color'] as int);
+        }
       }
     }
 
     return result;
+  }
+
+  Future<void> updateHighlightColor(
+    String className,
+    bool isTranscription,
+    String text,
+    Color newColor,
+  ) async {
+    final data = await loadData();
+
+    if (data.containsKey('highlights')) {
+      final highlights = data['highlights'] as List;
+      final index = highlights.indexWhere((h) =>
+          h['className'] == className &&
+          h['text'] == text &&
+          h['isTranscription'] == isTranscription);
+
+      if (index != -1) {
+        highlights[index]['color'] = newColor.value;
+        await saveData(data);
+      }
+    }
   }
 
   Future<void> saveNote(Map<String, dynamic> note) async {

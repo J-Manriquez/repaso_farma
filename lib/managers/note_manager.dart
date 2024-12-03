@@ -22,7 +22,6 @@ class NoteManager {
       'timestamp': DateTime.now().toIso8601String(),
     });
   }
-  
 
   Future<void> saveHighlight(
     String className,
@@ -53,11 +52,10 @@ class NoteManager {
     String text,
     Color color,
   ) async {
-    await _storage.updateHighlight(
+    await _storage.updateHighlightColor(
       className,
       isTranscription,
-      0,
-      text.length,
+      text,
       color,
     );
   }
