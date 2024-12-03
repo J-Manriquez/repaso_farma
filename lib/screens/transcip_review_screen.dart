@@ -36,7 +36,8 @@ class HighlightedText extends StatefulWidget {
   State<HighlightedText> createState() => _HighlightedTextState();
 }
 
-class _HighlightedTextState extends State<HighlightedText> {
+class _HighlightedTextState extends State<HighlightedText>
+    with WidgetsBindingObserver {
   final NoteManager _noteManager = NoteManager();
   TextSelectionControls? customControls;
   Map<String, HighlightData> highlights = {};
@@ -51,6 +52,7 @@ class _HighlightedTextState extends State<HighlightedText> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     customControls = CustomTextSelectionControls(
       onCopy: _handleCopy,
       onHighlight: _handleHighlight,
@@ -61,42 +63,72 @@ class _HighlightedTextState extends State<HighlightedText> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _doubleTapTimer?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      refreshData();
+    }
+  }
+
   Future<void> _loadData() async {
-    final loadedHighlights = await _noteManager.getHighlights(
-      widget.className,
-      widget.isTranscription,
-    );
-    final loadedNotes = await _noteManager.getNotes();
+    try {
+      // Cargar highlights
+      final loadedHighlights = await _noteManager.getHighlights(
+        widget.className,
+        widget.isTranscription,
+      );
 
-    if (!mounted) return;
+      // Cargar notas
+      final loadedNotes = await _noteManager.getNotes();
 
-    setState(() {
-      highlights.clear();
-      notes.clear();
+      if (!mounted) return;
 
-      loadedHighlights.forEach((text, color) {
-        int start = widget.text.indexOf(text);
-        if (start != -1) {
-          highlights[text] = HighlightData(
-            color: color,
-            range: TextRange(start: start, end: start + text.length),
-            isTranscription: widget.isTranscription,
-          );
+      setState(() {
+        highlights.clear();
+        notes.clear();
+
+        // Procesar highlights
+        loadedHighlights.forEach((text, color) {
+          int start = widget.text.indexOf(text);
+          if (start != -1) {
+            highlights[text] = HighlightData(
+              color: color,
+              range: TextRange(start: start, end: start + text.length),
+              isTranscription: widget.isTranscription,
+            );
+          }
+        });
+
+        // Procesar notas
+        for (var note in loadedNotes) {
+          if (note['className'] == widget.className &&
+              note['isTranscription'] == widget.isTranscription) {
+            notes[note['highlightedText'] as String] = note['note'] as String;
+          }
         }
       });
+    } catch (e) {
+      print('Error in _loadData: $e');
+    }
+  }
 
-      // Filtrar y cargar solo las notas correspondientes a esta vista
-      for (var note in loadedNotes) {
-        if (note['className'] == widget.className &&
-            note['isTranscription'] == widget.isTranscription) {
-          notes[note['highlightedText'] as String] = note['note'] as String;
-        }
-      }
-    });
+  // Agregar un método para recargar los datos
+  Future<void> refreshData() async {
+    await _loadData();
+  }
+
+  @override
+  void didUpdateWidget(HighlightedText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.className != widget.className ||
+        oldWidget.isTranscription != widget.isTranscription) {
+      _loadData();
+    }
   }
 
   void _handleTapDown(TapDownDetails details, TextRange range, String text) {
@@ -260,7 +292,7 @@ class _HighlightedTextState extends State<HighlightedText> {
         return AlertDialog(
           title: const Text('Seleccionar color'),
           content: ColorPicker(
-            onColorSelected: (color) {
+            onColorSelected: (color) async {
               setState(() {
                 highlights[selectedText] = HighlightData(
                   color: color,
@@ -276,6 +308,7 @@ class _HighlightedTextState extends State<HighlightedText> {
                 selectedText,
                 color,
               );
+              await refreshData();
 
               Navigator.of(context).pop();
             },

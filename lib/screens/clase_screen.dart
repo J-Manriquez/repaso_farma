@@ -18,6 +18,16 @@ class ClassDetailScreen extends StatefulWidget {
 }
 
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
+  @override
+  void didUpdateWidget(ClassDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.className != widget.className) {
+      // Recargar datos cuando cambia la clase
+      setState(() {
+        // Forzar reconstrucción del widget
+      });
+    }
+  }
   String _selectedOption = 'Transcripción de la Clase';
   final List<String> _options = [
     'Transcripción de la Clase',

@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 class StorageManager {
   static const String _fileName = 'app_data.json';
 
+  StorageManager() {
+    _ensureValidDataStructure();
+  }
+
   // {
   //   "highlights": [
   //     {
@@ -40,20 +44,34 @@ class StorageManager {
     try {
       final file = await _localFile;
       if (!await file.exists()) {
-        return {"highlights": {}, "notes": []};
+        return {"highlights": [], "notes": []};
       }
 
       String contents = await file.readAsString();
-      return json.decode(contents) as Map<String, dynamic>;
+      Map<String, dynamic> data = json.decode(contents);
+
+      // Asegurar que la estructura es correcta
+      if (!data.containsKey('highlights')) {
+        data['highlights'] = [];
+      }
+      if (!data.containsKey('notes')) {
+        data['notes'] = [];
+      }
+
+      return data;
     } catch (e) {
       print('Error loading data: $e');
-      return {"highlights": {}, "notes": []};
+      return {"highlights": [], "notes": []};
     }
   }
 
   Future<void> saveData(Map<String, dynamic> data) async {
     try {
       final file = await _localFile;
+      // Asegurarse de que los datos tienen la estructura correcta
+      if (!data.containsKey('highlights')) data['highlights'] = [];
+      if (!data.containsKey('notes')) data['notes'] = [];
+
       await file.writeAsString(json.encode(data));
     } catch (e) {
       print('Error saving data: $e');
@@ -64,36 +82,58 @@ class StorageManager {
     String className,
     bool isTranscription,
     String text,
-    int start,
-    int end,
     Color color,
   ) async {
-    final data = await loadData();
+    try {
+      final data = await loadData();
+      final highlights = data['highlights'] as List;
 
-    if (!data.containsKey('highlights')) {
-      data['highlights'] = [];
+      final highlightData = {
+        'className': className,
+        'text': text,
+        'color': color.value,
+        'isTranscription': isTranscription,
+      };
+
+      // Buscar si ya existe un highlight similar
+      final index = highlights.indexWhere((h) =>
+          h['className'] == className &&
+          h['text'] == text &&
+          h['isTranscription'] == isTranscription);
+
+      if (index != -1) {
+        highlights[index] = highlightData;
+      } else {
+        highlights.add(highlightData);
+      }
+
+      await saveData(data);
+    } catch (e) {
+      print('Error saving highlight: $e');
     }
+  }
 
-    final highlights = data['highlights'] as List;
-    final index = highlights.indexWhere((h) =>
-        h['className'] == className &&
-        h['text'] == text &&
-        h['isTranscription'] == isTranscription);
+  Future<void> _ensureValidDataStructure() async {
+    try {
+      final data = await loadData();
+      bool needsSave = false;
 
-    final highlightData = {
-      'className': className,
-      'text': text,
-      'color': color.value,
-      'isTranscription': isTranscription,
-    };
+      if (!data.containsKey('highlights') || !(data['highlights'] is List)) {
+        data['highlights'] = [];
+        needsSave = true;
+      }
 
-    if (index != -1) {
-      highlights[index] = highlightData;
-    } else {
-      highlights.add(highlightData);
+      if (!data.containsKey('notes') || !(data['notes'] is List)) {
+        data['notes'] = [];
+        needsSave = true;
+      }
+
+      if (needsSave) {
+        await saveData(data);
+      }
+    } catch (e) {
+      print('Error ensuring valid data structure: $e');
     }
-
-    await saveData(data);
   }
 
   Future<void> updateHighlight(
@@ -143,25 +183,17 @@ class StorageManager {
         : '${className}_review_highlights';
   }
 
-  Future<Map<String, Color>> getHighlights(
-    String className,
-    bool isTranscription,
-  ) async {
-    final data = await loadData();
-    Map<String, Color> result = {};
-
-    if (data.containsKey('highlights')) {
-      final highlights = data['highlights'] as List;
-      for (var highlight in highlights) {
-        if (highlight['className'] == className &&
-            highlight['isTranscription'] == isTranscription) {
-          result[highlight['text'] as String] =
-              Color(highlight['color'] as int);
-        }
+  Future<List<Map<String, dynamic>>> getHighlights() async {
+    try {
+      final data = await loadData();
+      if (data['highlights'] is List) {
+        return List<Map<String, dynamic>>.from(data['highlights']);
       }
+      return [];
+    } catch (e) {
+      print('Error getting highlights: $e');
+      return [];
     }
-
-    return result;
   }
 
   Future<void> updateHighlightColor(
@@ -225,9 +257,6 @@ class StorageManager {
 
   Future<List<Map<String, dynamic>>> getNotes() async {
     final data = await loadData();
-    if (!data.containsKey('notes')) {
-      return [];
-    }
-    return (data['notes'] as List).cast<Map<String, dynamic>>();
+    return List<Map<String, dynamic>>.from(data['notes'] ?? []);
   }
 }

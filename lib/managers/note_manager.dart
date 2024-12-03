@@ -22,8 +22,6 @@ class NoteManager {
       className,
       isTranscription,
       text,
-      0,
-      text.length,
       color,
     );
   }
@@ -32,7 +30,23 @@ class NoteManager {
     String className,
     bool isTranscription,
   ) async {
-    return await _storage.getHighlights(className, isTranscription);
+    try {
+      final highlights = await _storage.getHighlights();
+      Map<String, Color> result = {};
+
+      for (var highlight in highlights) {
+        if (highlight['className'] == className &&
+            highlight['isTranscription'] == isTranscription) {
+          result[highlight['text'] as String] =
+              Color(highlight['color'] as int);
+        }
+      }
+
+      return result;
+    } catch (e) {
+      print('Error getting highlights in NoteManager: $e');
+      return {};
+    }
   }
 
   Future<void> updateHighlightColor(
