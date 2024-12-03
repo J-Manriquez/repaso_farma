@@ -6,6 +6,7 @@ import 'package:repaso_farma/managers/highlight_colors_manager.dart';
 import '../managers/note_manager.dart';
 import '../widgets/color_picker.dart';
 import 'dart:async';
+import 'dart:math' as math;
 
 // Mover la clase HighlightData al nivel superior
 class HighlightData {
@@ -24,12 +25,14 @@ class HighlightedText extends StatefulWidget {
   final String text;
   final String className;
   final bool isTranscription;
+  final String? textToHighlight;
 
   const HighlightedText({
     super.key,
     required this.text,
     required this.className,
     required this.isTranscription,
+    this.textToHighlight,
   });
 
   @override
@@ -39,6 +42,8 @@ class HighlightedText extends StatefulWidget {
 class _HighlightedTextState extends State<HighlightedText>
     with WidgetsBindingObserver {
   final NoteManager _noteManager = NoteManager();
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _textKeys = {};
   TextSelectionControls? customControls;
   Map<String, HighlightData> highlights = {};
   Map<String, String> notes = {};
@@ -48,6 +53,9 @@ class _HighlightedTextState extends State<HighlightedText>
   int _tapCount = 0;
   Offset _tapPosition = Offset.zero;
   bool _isMenuOpen = false;
+  String? _temporarilyHighlightedText;
+  bool _hasScrolled = false; // Para controlar si ya se hizo el scroll
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -59,12 +67,46 @@ class _HighlightedTextState extends State<HighlightedText>
       onNote: _handleNoteAdd,
     );
     _loadData();
+    if (widget.textToHighlight != null) {
+      _textKeys[widget.textToHighlight!] = GlobalKey();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToHighlightedText();
+      });
+    }
+  }
+
+  void _scrollToHighlightedText() {
+    if (!_initialized && widget.textToHighlight != null) {
+      final key = _textKeys[widget.textToHighlight!];
+      if (key?.currentContext != null) {
+        Scrollable.ensureVisible(
+          key!.currentContext!,
+          alignment:
+              0.3, // Ajusta este valor para cambiar la posición vertical (0-1)
+          duration: const Duration(milliseconds: 300),
+        );
+        _initialized = true;
+        setState(() {
+          _temporarilyHighlightedText = widget.textToHighlight;
+        });
+
+        // Opcional: remover el resaltado después de un tiempo
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() {
+              _temporarilyHighlightedText = null;
+            });
+          }
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _doubleTapTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -128,6 +170,10 @@ class _HighlightedTextState extends State<HighlightedText>
     if (oldWidget.className != widget.className ||
         oldWidget.isTranscription != widget.isTranscription) {
       _loadData();
+    }
+    if (widget.textToHighlight != oldWidget.textToHighlight) {
+      _hasScrolled = false; // Resetear el flag si cambia el texto a buscar
+      
     }
   }
 
@@ -565,12 +611,73 @@ class _HighlightedTextState extends State<HighlightedText>
 
   @override
   Widget build(BuildContext context) {
-    return SelectableText.rich(
-      TextSpan(
-        children: _buildTextSpans(),
+    return SingleChildScrollView(
+      controller: _scrollController,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SelectableText.rich(
+          TextSpan(
+            children: _buildTextSpansWithKeys(),
+          ),
+          selectionControls: customControls,
+        ),
       ),
-      selectionControls: customControls,
     );
+  }
+
+  List<TextSpan> _buildTextSpansWithKeys() {
+    if (widget.textToHighlight == null) {
+      return _buildTextSpans();
+    }
+
+    List<TextSpan> spans = [];
+    final String searchText = widget.textToHighlight!;
+    final int highlightIndex = widget.text.indexOf(searchText);
+
+    if (highlightIndex != -1) {
+      // Texto antes del resaltado
+      if (highlightIndex > 0) {
+        spans.add(TextSpan(
+          text: widget.text.substring(0, highlightIndex),
+        ));
+      }
+
+      // Texto resaltado
+      spans.add(
+        TextSpan(
+          children: [
+            WidgetSpan(
+              child: Container(
+                key: _textKeys[searchText],
+                color: _temporarilyHighlightedText == searchText
+                    ? const Color.fromARGB(255, 15, 15, 15)
+                    : Colors.transparent,
+                child: Text(
+                  searchText,
+                  style: const TextStyle(
+                    backgroundColor: Colors.black,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      // Texto después del resaltado
+      final int endIndex = highlightIndex + searchText.length;
+      if (endIndex < widget.text.length) {
+        spans.add(TextSpan(
+          text: widget.text.substring(endIndex),
+        ));
+      }
+
+      return spans;
+    }
+
+    return _buildTextSpans();
   }
 
   List<TextSpan> _buildTextSpans() {

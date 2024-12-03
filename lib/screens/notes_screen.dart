@@ -154,24 +154,15 @@ class _NotesScreenState extends State<NotesScreen> {
 
   void _viewNoteInText(Map<String, dynamic> note) {
     Navigator.pop(context); // Cierra la pantalla de notas
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => ClassDetailScreen(
           className: widget.className,
+          highlightedTextToShow: note['highlightedText'],
         ),
       ),
-    ).then((_) {
-      // Cuando regrese, volvemos a abrir la pantalla de notas
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NotesScreen(
-            className: widget.className,
-          ),
-        ),
-      );
-    });
+    );
   }
 
   void _editNote(Map<String, dynamic> note) {

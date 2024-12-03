@@ -21,13 +21,19 @@ class FullScreenImage extends StatelessWidget {
           child: Stack(
             children: [
               // Imagen con InteractiveViewer para zoom
-              Center(
-                child: InteractiveViewer(
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: Hero(
-                    tag: imagePath,
-                    child: Image.asset(imagePath),
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                boundaryMargin: const EdgeInsets.all(double.infinity), // Permite el desplazamiento infinito
+                child: Hero(
+                  tag: imagePath,
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height,
+                    child: Image.asset(
+                      imagePath,
+                      fit: BoxFit.contain, // Asegura que la imagen se ajuste inicialmente
+                    ),
                   ),
                 ),
               ),

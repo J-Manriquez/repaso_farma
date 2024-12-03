@@ -31,7 +31,7 @@ class ClassesScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Clase 1',
-                  style: TextStyle(fontSize: 18),
+                  style: TextStyle(fontSize: 18, color: Colors.black, ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -47,7 +47,7 @@ class ClassesScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Clase 3',
-                  style: TextStyle(fontSize: 18),
+                  style: TextStyle(fontSize: 18, color: Colors.black, ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -63,7 +63,7 @@ class ClassesScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Clase 4',
-                  style: TextStyle(fontSize: 18),
+                  style: TextStyle(fontSize: 18, color: Colors.black, ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -79,7 +79,7 @@ class ClassesScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Clase Repaso',
-                  style: TextStyle(fontSize: 18),
+                  style: TextStyle(fontSize: 18, color: Colors.black, ),
                 ),
               ),
               const SizedBox(height: 60), // Espacio adicional para separar
@@ -94,7 +94,7 @@ class ClassesScreen extends StatelessWidget {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
-                      Colors.orange, // Color diferente para destacar
+                      const Color.fromARGB(230, 218, 105, 105), // Color diferente para destacar
                   padding:
                       const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                 ),
@@ -103,6 +103,7 @@ class ClassesScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white, 
                   ),
                 ),
               ),
